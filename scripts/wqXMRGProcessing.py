@@ -221,13 +221,18 @@ def process_xmrg_file(**kwargs):
             #If we are using a bounding box, let's get the row/col in hrap coords.
             llHrap = None
             urHrap = None
-            startCol = 0
-            startRow = 0
+            start_col = 0
+            start_row = 0
+            end_col = xmrg.MAXX
+            end_row = xmrg.MAXY
             if minLatLong != None and maxLatLong != None:
               llHrap = xmrg.latLongToHRAP(minLatLong, True, True)
               urHrap = xmrg.latLongToHRAP(maxLatLong, True, True)
-              startCol = llHrap.column
-              startRow = llHrap.row
+              start_row = llHrap.row
+              start_col = llHrap.column
+              end_row = urHrap.row
+              end_col = urHrap.column
+
             recsAdded = 0
             results = xmrg_results()
 
@@ -236,9 +241,9 @@ def process_xmrg_file(**kwargs):
             add_db_rec_total_time = 0
             #for row in range(startRow,xmrg.MAXY):
             #  for col in range(startCol,xmrg.MAXX):
-            for row in range(llHrap.row, urHrap.row):
-              for col in range(llHrap.column, urHrap.column):
-                hrap = hrapCoord( xmrg.XOR + col, xmrg.YOR + row )
+            for row in range(start_row, end_row):
+              for col in range(start_col, end_col):
+                hrap = hrapCoord(xmrg.XOR + col, xmrg.YOR + row)
                 latlon = xmrg.hrapCoordToLatLong(hrap)
                 latlon.longitude *= -1
                 """
@@ -509,7 +514,7 @@ class wqXMRGProcessing(processXMRGData):
         importDirectory = self.importDirectory
 
       if self.logger:
-        self.logger.debug("Importing from: %s" % (rec_count, importDirectory))
+        self.logger.debug("Importing from: %s" % (importDirectory))
 
       workers = 4
       inputQueue = Queue()
@@ -583,6 +588,7 @@ class wqXMRGProcessing(processXMRGData):
       if self.configSettings.writePrecipToKML and xmrg_results.get_boundary_grid('complete_area') is not None:
         if self.configSettings.writePrecipToKML:
           self.write_boundary_grid_kml('complete_area', xmrg_results.datetime, xmrg_results.get_boundary_grid('complete_area'))
+
       for boundary_name, boundary_results in xmrg_results.get_boundary_data():
         if self.configSettings.writePrecipToKML and xmrg_results.get_boundary_grid(boundary_name) is not None:
           self.write_boundary_grid_kml(boundary_name, xmrg_results.datetime, xmrg_results.get_boundary_grid(boundary_name))
