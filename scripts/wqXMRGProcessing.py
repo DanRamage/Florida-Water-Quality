@@ -97,7 +97,7 @@ class configSettings(object):
       self.boundaries_file = configFile.get('boundaries_settings', 'boundaries_file')
 
       #Number of worker processes to start.
-      self.worker_process_count = configFile.get('processing_settings', 'worker_process_count')
+      self.worker_process_count = configFile.getint('processing_settings', 'worker_process_count')
 
       #Specifies to attempt to add the sensors before inserting the data. Only need to do this
       #on intial run.
