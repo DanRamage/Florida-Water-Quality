@@ -319,27 +319,30 @@ def process_xmrg_file(**kwargs):
 
               results.datetime = filetime
               for boundary in boundaries:
-                if save_boundary_grid_cells:
-                  boundary_grid_query_start = time.time()
-                  cells_cursor = nexrad_db_conn.get_radar_data_for_boundary(boundary['polygon'], filetime, filetime)
-                  for row in cells_cursor:
-                    cell_poly = wkt_loads(row['WKT'])
-                    precip = row['precipitation']
-                    results.add_grid(boundary['name'], (cell_poly, precip))
+                try:
+                  if save_boundary_grid_cells:
+                    boundary_grid_query_start = time.time()
+                    cells_cursor = nexrad_db_conn.get_radar_data_for_boundary(boundary['polygon'], filetime, filetime)
+                    for row in cells_cursor:
+                      cell_poly = wkt_loads(row['WKT'])
+                      precip = row['precipitation']
+                      results.add_grid(boundary['name'], (cell_poly, precip))
 
+                    if logger:
+                      logger.debug("ID: %s(%f secs) to query grids for boundary: %s"\
+                                   % (current_process().name, time.time() - boundary_grid_query_start, boundary['name']))
+
+
+                  avg_start_time = time.time()
+                  avg = nexrad_db_conn.calculate_weighted_average(boundary['polygon'], filetime, filetime)
+                  results.add_boundary_result(boundary['name'], 'weighted_average', avg)
+                  avg_total_time = time.time() - avg_start_time
                   if logger:
-                    logger.debug("ID: %s(%f secs) to query grids for boundary: %s"\
-                                 % (current_process().name, time.time() - boundary_grid_query_start, boundary['name']))
-
-
-                avg_start_time = time.time()
-                avg = nexrad_db_conn.calculate_weighted_average(boundary['polygon'], filetime, filetime)
-                results.add_boundary_result(boundary['name'], 'weighted_average', avg)
-                avg_total_time = time.time() - avg_start_time
-                if logger:
-                  logger.debug("ID: %s(%f secs) to process average for boundary: %s"\
-                               % (current_process().name, avg_total_time, boundary['name']))
-
+                    logger.debug("ID: %s(%f secs) to process average for boundary: %s"\
+                                 % (current_process().name, avg_total_time, boundary['name']))
+                except Exception,e:
+                  if logger:
+                    logger.exception(e)
             resultsQueue.put(results)
 
             nexrad_db_conn.delete_all()
@@ -516,7 +519,7 @@ class wqXMRGProcessing(processXMRGData):
       if self.logger:
         self.logger.debug("Importing from: %s" % (importDirectory))
 
-      workers = 4
+      workers = 1
       inputQueue = Queue()
       resultQueue = Queue()
       finalResults = []
@@ -609,6 +612,8 @@ class wqXMRGProcessing(processXMRGData):
                                         1,
                                         0,
                                         1, None, True)
+              #Build a dict of m_type and sensor_id for each platform to make the inserts
+              #quicker.
               if platform_handle not in self.sensor_ids:
                 m_type_id = self.xenia_db.getMTypeFromObsName('precipitation_radar_weighted_average', 'mm', platform_handle, 1)
                 sensor_id = self.xenia_db.sensorExists('precipitation_radar_weighted_average', 'mm', platform_handle, 1)
@@ -618,17 +623,6 @@ class wqXMRGProcessing(processXMRGData):
               #Add the avg into the multi obs table. Since we are going to deal with the hourly data for the radar and use
               #weighted averages, instead of keeping lots of radar data in the radar table, we calc the avg and
               #store it as an obs in the multi-obs table.
-              """
-              if self.xenia_db.addMeasurement('precipitation_radar_weighted_average', 'mm',
-                                                 platform_handle,
-                                                 xmrg_results.datetime,
-                                                 lat, lon,
-                                                 0,
-                                                 mVals,
-                                                 1,
-                                                 False,
-                                                 self.processingStartTime) != True:
-              """
               add_obs_start_time = time.time()
               if self.xenia_db.addMeasurementWithMType(self.sensor_ids[platform_handle]['m_type_id'],
                                               self.sensor_ids[platform_handle]['sensor_id'],
@@ -647,8 +641,6 @@ class wqXMRGProcessing(processXMRGData):
                   self.logger.error( "%s"\
                                      %(self.xenia_db.getErrorInfo()) )
                 self.xenia_db.clearErrorInfo()
-                return(False)
-              recsAdded = True
             else:
               if self.logger is not None:
                 self.logger.debug( "Platform: %s Date: %s weighted avg: %f(mm) is not valid, not adding to database." %(platform_handle, xmrg_results.datetime, avg))
