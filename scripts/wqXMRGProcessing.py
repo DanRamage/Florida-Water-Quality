@@ -562,43 +562,7 @@ class wqXMRGProcessing(processXMRGData):
 
 
 
-      """
-      db = dhecDB(self.configSettings.dbName, None, self.logger)
-      if self.logger != None:
-        self.logger.debug("Loading spatialite: %s" %(self.configSettings.spatiaLiteLib))
-      if db.loadSpatiaLiteLib(self.configSettings.spatiaLiteLib) == False:
-        if self.logger is not None:
-          self.logger.debug("Error loading: %s Error: %s" %(self.configSettings.spatiaLiteLib,db.lastErrorMsg))
-
-      startMonth = 'Apr'
-      endMonth   = 'Oct'
-      #Get a list of the files in the import dir.
-      fileList = os.listdir(importDirectory)
-      #If we want to skip certain months, let's pull those files out of the list.
-      monthList = {'Jan': 1, 'Feb': 2, 'Mar': 3, "Apr": 4, "May": 5, "Jun": 6, "Jul": 7, "Aug": 8, "Sep": 9, "Oct": 10, "Nov": 11, "Dec": 12 }
-      startMonth = monthList[startMonth]
-      endMonth = monthList[endMonth]
-
-      for fileName in fileList:
-        fileTime = self.getCollectionDateFromFilename(fileName)
-        #Get the month from the time.
-        month = time.strptime(fileTime, "%Y-%m-%dT%H:%M:%S")
-        month = int(time.strftime("%m", month))
-        #If the file is outside the month range we are interested in, go on to the next file.
-        if month < startMonth or month > endMonth:
-          continue
-        fullPath = "%s/%s" %(importDirectory,fileName)
-        #Make sure we are trying to import a file and not a directory.
-        if os.path.isfile(fullPath) != True:
-          self.logger.debug("%s is not a file, skipping" % (fullPath))
-          continue
-        if self.processXMRGFile(fullPath, db):
-          self.logger.debug("Successfully processed: %s" %(fileName))
-        else:
-          self.logger.error("Unable to process: %s" %(fileName))
-      db.DB.close()
-      """
-    except Exception, E:
+     except Exception, E:
       self.lastErrorMsg = str(E)
       if self.logger is not None:
         self.logger.exception(E)
