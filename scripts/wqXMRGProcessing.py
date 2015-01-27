@@ -508,6 +508,8 @@ class wqXMRGProcessing(processXMRGData):
       if importDirectory is None:
         importDirectory = self.importDirectory
 
+      if self.logger:
+        self.logger.debug("Importing from: %s" % (rec_count, importDirectory))
 
       workers = 4
       inputQueue = Queue()
@@ -563,9 +565,11 @@ class wqXMRGProcessing(processXMRGData):
 
       #Poll the queue once more to get any remaining records.
       while(resultQueue.empty() == False):
-        finalResults.append(resultQueue.get())
+        self.process_result(resultQueue.get())
+        rec_count += 1
 
-
+      if self.logger:
+        self.logger.debug("Finished. Import: %d records from: %s" % (rec_count, importDirectory))
 
     except Exception, E:
       self.lastErrorMsg = str(E)
