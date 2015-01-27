@@ -96,6 +96,9 @@ class configSettings(object):
       #File containing the boundaries we want to use to carve out data from the XMRG file.
       self.boundaries_file = configFile.get('boundaries_settings', 'boundaries_file')
 
+      #Number of worker processes to start.
+      self.worker_process_count = configFile.get('processing_settings', 'worker_process_count')
+
       #Specifies to attempt to add the sensors before inserting the data. Only need to do this
       #on intial run.
       self.add_sensors = True
@@ -519,7 +522,7 @@ class wqXMRGProcessing(processXMRGData):
       if self.logger:
         self.logger.debug("Importing from: %s" % (importDirectory))
 
-      workers = 1
+      workers = self.configSettings.worker_process_count
       inputQueue = Queue()
       resultQueue = Queue()
       finalResults = []
