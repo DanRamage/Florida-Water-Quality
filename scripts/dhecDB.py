@@ -40,15 +40,17 @@ class nexrad_db(object):
       return(True)
     return(False)
 
-  def insert_precip_record(self, datetime, filetime, latitude, longitude, val, grid_polygon):
+  def insert_precip_record(self, datetime, filetime, latitude, longitude, val, grid_polygon, trans_cursor=None):
     sql = "INSERT INTO precipitation_radar \
           (insert_date,collection_date,latitude,longitude,precipitation,geom) \
           VALUES('%s','%s',%f,%f,%f,GeomFromText('%s',4326));" \
           %(datetime, filetime, latitude, longitude, val, grid_polygon.wkt)
-
-    cursor = self.db_connection.cursor()
-    cursor.execute(sql)
-    cursor.close()
+    if trans_cursor != None:
+      trans_cursor.execute(sql)
+    else:
+      cursor = self.db_connection.cursor()
+      cursor.execute(sql)
+      cursor.close()
 
   def commit(self):
     self.db_connection.commit()
