@@ -43,8 +43,8 @@ class nexrad_db(object):
   def insert_precip_record(self, datetime, filetime, latitude, longitude, val, grid_polygon, trans_cursor=None):
     sql = "INSERT INTO precipitation_radar \
           (insert_date,collection_date,latitude,longitude,precipitation,geom) \
-          VALUES('%s','%s',%f,%f,%f,GeomFromText('%s',4326));" \
-          %(datetime, filetime, latitude, longitude, val, grid_polygon.wkt)
+          VALUES('%s','%s',%f,%f,%f,GeomFromWKB(X'%s',4326));" \
+          %(datetime, filetime, latitude, longitude, val, grid_polygon.wkb_hex)
     if trans_cursor != None:
       trans_cursor.execute(sql)
     else:
@@ -83,8 +83,8 @@ class nexrad_db(object):
             WHERE\
             (collection_date >= '%s' AND collection_date <= '%s') AND\
             Intersects( Geom, \
-                        GeomFromText('%s'))"\
-            % (start_time, end_time, boundary_polygon.wkt)
+                        GeomFromWKB(X'%s'))"\
+            % (start_time, end_time, boundary_polygon.wkb_hex)
     db_cursor = self.db_connection.cursor()
     db_cursor.execute(sql)
     return db_cursor
@@ -104,12 +104,12 @@ class nexrad_db(object):
     weighted_avg = -9999
     #Get the percentages that the intersecting radar grid make up of the watershed boundary.
     sql = "SELECT * FROM(\
-           SELECT (Area(Intersection(radar.geom,GeomFromText('%s')))/Area(GeomFromText('%s'))) as percent,\
+           SELECT (Area(Intersection(radar.geom,GeomFromWKB(X'%s', 4326)))/Area(GeomFromWKB(X'%s', 4326))) as percent,\
                    radar.precipitation as precipitation\
            FROM precipitation_radar radar\
            WHERE radar.collection_date >= '%s' AND radar.collection_date <= '%s' AND\
-                Intersects(radar.geom, GeomFromText('%s')))"\
-                %(boundary_polygon.wkt, boundary_polygon.wkt, start_time, end_time, boundary_polygon.wkt)
+                Intersects(radar.geom, GeomFromWKB(X'%s', 4326)))"\
+                %(boundary_polygon.wkb_hex, boundary_polygon.wkb_hex, start_time, end_time, boundary_polygon.wkb_hex)
     db_cursor = self.db_connection.cursor()
     db_cursor.execute(sql)
     if db_cursor != None:

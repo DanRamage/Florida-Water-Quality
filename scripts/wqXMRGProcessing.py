@@ -165,7 +165,7 @@ def process_xmrg_file(**kwargs):
     #Boundaries we are creating the weighted averages for.
     boundaries = kwargs['boundaries']
 
-    save_boundary_grid_cells = False
+    save_boundary_grid_cells = True
     save_boundary_grids_one_pass = True
 
     #This is the database insert datetime.
@@ -181,7 +181,7 @@ def process_xmrg_file(**kwargs):
                            nexrad_schema_files=kwargs['nexrad_schema_files'],
                            nexrad_schema_directory=kwargs['nexrad_schema_directory']
                            )
-    nexrad_db_conn.db_connection.isolation_level = None
+    #nexrad_db_conn.db_connection.isolation_level = None
     nexrad_db_conn.db_connection.execute("PRAGMA synchronous = OFF")
     nexrad_db_conn.db_connection.execute("PRAGMA journal_mode = MEMORY")
   except Exception,e:
@@ -231,12 +231,24 @@ def process_xmrg_file(**kwargs):
             recsAdded = 0
             results = xmrg_results()
 
-            trans_cursor = nexrad_db_conn.db_connection.cursor()
-            trans_cursor.execute("BEGIN")
+            #trans_cursor = nexrad_db_conn.db_connection.cursor()
+            #trans_cursor.execute("BEGIN")
             add_db_rec_total_time = 0
-            for row in range(startRow,xmrg.MAXY):
-              for col in range(startCol,xmrg.MAXX):
-
+            #for row in range(startRow,xmrg.MAXY):
+            #  for col in range(startCol,xmrg.MAXX):
+            for row in range(llHrap.row, urHrap.row):
+              for col in range(llHrap.column, urHrap.column):
+                hrap = hrapCoord( xmrg.XOR + col, xmrg.YOR + row )
+                latlon = xmrg.hrapCoordToLatLong(hrap)
+                latlon.longitude *= -1
+                """
+                use_record = False
+                if minLatLong is not None and maxLatLong is not None:
+                  if xmrg.inBBOX(latlon, minLatLong, maxLatLong):
+                    use_record = True
+                else:
+                  use_record = True
+                """
                 val = xmrg.grid[row][col]
                 #If there is no precipitation value, or the value is erroneous
                 if val <= 0:
@@ -247,52 +259,45 @@ def process_xmrg_file(**kwargs):
                 else:
                   val /= dataConvert
 
-                hrap = hrapCoord( xmrg.XOR + col, xmrg.YOR + row )
-                latlon = xmrg.hrapCoordToLatLong(hrap)
-                latlon.longitude *= -1
-                use_record = False
-                if minLatLong is not None and maxLatLong is not None:
-                  if xmrg.inBBOX(latlon, minLatLong, maxLatLong):
-                    use_record = True
-                else:
-                  use_record = True
-                if use_record:
-                  rainDataFound = True
-                  #Build polygon points. Each grid point represents a 4km square, so we want to create a polygon
-                  #that has each point in the grid for a given point.
-                  hrapNewPt = hrapCoord( xmrg.XOR + col, xmrg.YOR + row + 1)
-                  latlonUL = xmrg.hrapCoordToLatLong( hrapNewPt )
-                  latlonUL.longitude *= -1
+                rainDataFound = True
+                #Build polygon points. Each grid point represents a 4km square, so we want to create a polygon
+                #that has each point in the grid for a given point.
+                hrapNewPt = hrapCoord( xmrg.XOR + col, xmrg.YOR + row + 1)
+                latlonUL = xmrg.hrapCoordToLatLong( hrapNewPt )
+                latlonUL.longitude *= -1
 
-                  hrapNewPt = hrapCoord( xmrg.XOR + col + 1, xmrg.YOR + row)
-                  latlonBR = xmrg.hrapCoordToLatLong( hrapNewPt )
-                  latlonBR.longitude *= -1
+                hrapNewPt = hrapCoord( xmrg.XOR + col + 1, xmrg.YOR + row)
+                latlonBR = xmrg.hrapCoordToLatLong( hrapNewPt )
+                latlonBR.longitude *= -1
 
-                  hrapNewPt = hrapCoord( xmrg.XOR + col + 1, xmrg.YOR + row + 1)
-                  latlonUR = xmrg.hrapCoordToLatLong( hrapNewPt )
-                  latlonUR.longitude *= -1
+                hrapNewPt = hrapCoord( xmrg.XOR + col + 1, xmrg.YOR + row + 1)
+                latlonUR = xmrg.hrapCoordToLatLong( hrapNewPt )
+                latlonUR.longitude *= -1
 
-                  grid_polygon = Polygon([(latlon.longitude, latlon.latitude),
-                                          (latlonUL.longitude, latlonUL.latitude),
-                                          (latlonUR.longitude, latlonUR.latitude),
-                                          (latlonBR.longitude, latlonBR.latitude),
-                                          (latlon.longitude, latlon.latitude)])
+                grid_polygon = Polygon([(latlon.longitude, latlon.latitude),
+                                        (latlonUL.longitude, latlonUL.latitude),
+                                        (latlonUR.longitude, latlonUR.latitude),
+                                        (latlonBR.longitude, latlonBR.latitude),
+                                        (latlon.longitude, latlon.latitude)])
+                if save_boundary_grid_cells:
                   results.add_grid('complete_area', (grid_polygon, val))
 
-                  try:
-                    add_db_rec_start = time.time()
-                    nexrad_db_conn.insert_precip_record(datetime, filetime,
-                                                        latlon.latitude, latlon.longitude,
-                                                        val,
-                                                        grid_polygon,
-                                                        trans_cursor)
-                    add_db_rec_total_time += time.time() - add_db_rec_start
+                try:
+                  add_db_rec_start = time.time()
+                  nexrad_db_conn.insert_precip_record(datetime, filetime,
+                                                      latlon.latitude, latlon.longitude,
+                                                      val,
+                                                      grid_polygon,
+                                                      None)
+                  #if logger:
+                  # logger.debug("ID: %s(%f secs insert)" % (current_process().name, time.time() - add_db_rec_start))
+                  add_db_rec_total_time += time.time() - add_db_rec_start
 
-                    recsAdded += 1
-                  except Exception,e:
-                    if logger:
-                      logger.exception(e)
-                    nexrad_db_conn.db_connection.rollback()
+                  recsAdded += 1
+                except Exception,e:
+                  if logger:
+                    logger.exception(e)
+                  nexrad_db_conn.db_connection.rollback()
             #Commit the inserts.
             try:
               commit_recs_start = time.time()
@@ -504,7 +509,7 @@ class wqXMRGProcessing(processXMRGData):
         importDirectory = self.importDirectory
 
 
-      workers = 1
+      workers = 4
       inputQueue = Queue()
       resultQueue = Queue()
       finalResults = []
@@ -577,8 +582,6 @@ class wqXMRGProcessing(processXMRGData):
       for boundary_name, boundary_results in xmrg_results.get_boundary_data():
         if self.configSettings.writePrecipToKML and xmrg_results.get_boundary_grid(boundary_name) is not None:
           self.write_boundary_grid_kml(boundary_name, xmrg_results.datetime, xmrg_results.get_boundary_grid(boundary_name))
-        if self.configSettings.save_boundary_grids_one_pass:
-          self.configSettings.writePrecipToKML = False
 
         platform_handle = "nws.%s.radarcoverage" % (boundary_name)
         lat = 0.0
@@ -646,6 +649,9 @@ class wqXMRGProcessing(processXMRGData):
           if self.logger is not None:
             self.logger.error( "Platform: %s Date: %s Weighted AVG error: %s" %(platform_handle, xmrg_results.datetime, self.xenia_db.getErrorInfo()) )
             self.xenia_db.clearErrorInfo()
+      if self.configSettings.save_boundary_grids_one_pass:
+        self.configSettings.writePrecipToKML = False
+
     except StopIteration, e:
       if self.logger:
         self.logger.info("Date: %s Boundary data exhausted" % (xmrg_results.datetime))
