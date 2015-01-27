@@ -504,7 +504,7 @@ class wqXMRGProcessing(processXMRGData):
         importDirectory = self.importDirectory
 
 
-      workers = 4
+      workers = 1
       inputQueue = Queue()
       resultQueue = Queue()
       finalResults = []
@@ -562,7 +562,7 @@ class wqXMRGProcessing(processXMRGData):
 
 
 
-     except Exception, E:
+    except Exception, E:
       self.lastErrorMsg = str(E)
       if self.logger is not None:
         self.logger.exception(E)
