@@ -165,20 +165,25 @@ def process_xmrg_file(**kwargs):
     #Boundaries we are creating the weighted averages for.
     boundaries = kwargs['boundaries']
 
-    save_boundary_grid_cells = True
+    save_boundary_grid_cells = False
     save_boundary_grids_one_pass = True
 
     #This is the database insert datetime.
     datetime = time.strftime( "%Y-%m-%dT%H:%M:%S", time.localtime() )
 
     #Create the precip database we use local to the thread.
+    #nexrad_filename = "%s%s.sqlite" % (kwargs['nexrad_schema_directory'], current_process().name)
+    #if os.path.isfile(nexrad_filename):
+    #  os.remove(nexrad_filename)
     nexrad_db_conn = nexrad_db()
     nexrad_db_conn.connect(db_name=":memory:",
                            spatialite_lib=kwargs['spatialite_lib'],
                            nexrad_schema_files=kwargs['nexrad_schema_files'],
                            nexrad_schema_directory=kwargs['nexrad_schema_directory']
                            )
-
+    nexrad_db_conn.db_connection.isolation_level = None
+    nexrad_db_conn.db_connection.execute("PRAGMA synchronous = OFF")
+    nexrad_db_conn.db_connection.execute("PRAGMA journal_mode = MEMORY")
   except Exception,e:
     if logger:
       logger.exception(e)
@@ -225,6 +230,10 @@ def process_xmrg_file(**kwargs):
               startRow = llHrap.row
             recsAdded = 0
             results = xmrg_results()
+
+            trans_cursor = nexrad_db_conn.db_connection.cursor()
+            trans_cursor.execute("BEGIN")
+            add_db_rec_total_time = 0
             for row in range(startRow,xmrg.MAXY):
               for col in range(startCol,xmrg.MAXX):
 
@@ -275,8 +284,9 @@ def process_xmrg_file(**kwargs):
                     nexrad_db_conn.insert_precip_record(datetime, filetime,
                                                         latlon.latitude, latlon.longitude,
                                                         val,
-                                                        grid_polygon)
-                    add_db_rec_total_time = time.time() - add_db_rec_start
+                                                        grid_polygon,
+                                                        trans_cursor)
+                    add_db_rec_total_time += time.time() - add_db_rec_start
 
                     recsAdded += 1
                   except Exception,e:
@@ -534,10 +544,13 @@ class wqXMRGProcessing(processXMRGData):
       #If we don't empty the resultQueue periodically, the .join() below would block continously.
       #See docs: http://docs.python.org/2/library/multiprocessing.html#multiprocessing-programming
       #the blurb on Joining processes that use queues
+      rec_count = 0
       while any([checkJob.is_alive() for checkJob in processes]):
         if(resultQueue.empty() == False):
+
           #finalResults.append(resultQueue.get())
           self.process_result(resultQueue.get())
+          rec_count += 1
 
       #Wait for the process to finish.
       for p in processes:
