@@ -108,8 +108,8 @@ class configSettings(object):
       self.save_boundary_grid_cells = True
       self.save_boundary_grids_one_pass = True
 
-    except (ConfigParser.Error, Exception) as e:
-      raise e
+    except (ConfigParser.Error, Exception):
+      pass
 
 class xmrg_results(object):
   def __init__(self):
