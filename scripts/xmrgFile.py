@@ -715,6 +715,121 @@ class xmrgDB(object):
       sys.exit(-1)      
     return(False)
 
+class nexrad_db(object):
+  def __init__(self):
+    self.db_connection = None
+
+  def connect(self, **kwargs):
+    if 'db_name' in kwargs:
+      self.db_connection = sqlite3.connect(kwargs['db_name'])
+    #This enables the ability to manipulate rows with the column name instead of an index.
+    self.db_connection.row_factory = sqlite3.Row
+
+    #Get the schema files that make up the database.
+    for schema_file in kwargs['nexrad_schema_files']:
+      full_path = "%s%s" % (kwargs['nexrad_schema_directory'], schema_file)
+      with open(full_path, 'rt') as f:
+        schema = f.read()
+        self.db_connection.executescript(schema)
+
+    self.db_connection.enable_load_extension(True)
+    sql = 'SELECT load_extension("%s");' % (kwargs['spatialite_lib'])
+    db_cursor = self.db_connection.cursor()
+    db_cursor.execute(sql)
+
+    if(db_cursor != None):
+      return(True)
+    return(False)
+
+  def insert_precip_record(self, datetime, filetime, latitude, longitude, val, grid_polygon, trans_cursor=None):
+    sql = "INSERT INTO precipitation_radar \
+          (insert_date,collection_date,latitude,longitude,precipitation,geom) \
+          VALUES('%s','%s',%f,%f,%f,GeomFromWKB(X'%s',4326));" \
+          %(datetime, filetime, latitude, longitude, val, grid_polygon.wkb_hex)
+    if trans_cursor != None:
+      trans_cursor.execute(sql)
+    else:
+      cursor = self.db_connection.cursor()
+      cursor.execute(sql)
+      cursor.close()
+
+  def commit(self):
+    self.db_connection.commit()
+
+  def delete_all(self):
+    sql = "DELETE FROM precipitation_radar;"
+    cursor = self.db_connection.execute(sql);
+    self.db_connection.commit()
+    cursor.close()
+    sql = "VACUUM;"
+    cursor = self.db_connection.execute(sql);
+    cursor.close()
+
+  def close(self):
+    self.db_connection.close()
+
+  """
+  Function: get_radar_data_for_boundary
+  Purpose: For a given polygon this function queries the radar data, gets the grids that fall
+   into the polygon of interest.
+  Parameters:
+    boundary_polygon is the shapely Polygon we want to query the intersecting grids for.
+    start_time is the starting time in YYYY-MM-DDTHH:MM:SS format.
+    end_time is the starting time in YYYY-MM-DDTHH:MM:SS format.
+  Return:
+    Cursor with the recordset or None if query failed.
+  """
+  def get_radar_data_for_boundary(self, boundary_polygon, start_time, end_time):
+    sql = "SELECT ogc_fid,latitude,longitude,precipitation,AsText(geom) as WKT FROM precipitation_radar \
+            WHERE\
+            (collection_date >= '%s' AND collection_date <= '%s') AND\
+            Intersects( Geom, \
+                        GeomFromWKB(X'%s'))"\
+            % (start_time, end_time, boundary_polygon.wkb_hex)
+    db_cursor = self.db_connection.cursor()
+    db_cursor.execute(sql)
+    return db_cursor
+  """
+  Function: calculate_weighted_average
+  Purpose: For a given polygon this function queries the radar data, gets the grids that fall
+   into the watershed of interest and calculates the weighted average.
+  Parameters:
+    watershedName is the watershed we want to calculate the average for. For ease of use, I use the rain gauge name to
+       name the watersheds.
+    start_time is the starting time in YYYY-MM-DDTHH:MM:SS format.
+    end_time is the starting time in YYYY-MM-DDTHH:MM:SS format.
+  Return:
+  Weighted average if calculated, otherwise -9999.
+  """
+  def calculate_weighted_average(self, boundary_polygon, start_time, end_time):
+    weighted_avg = -9999
+    #Get the percentages that the intersecting radar grid make up of the watershed boundary.
+    sql = "SELECT * FROM(\
+           SELECT (Area(Intersection(radar.geom,GeomFromWKB(X'%s', 4326)))/Area(GeomFromWKB(X'%s', 4326))) as percent,\
+                   radar.precipitation as precipitation\
+           FROM precipitation_radar radar\
+           WHERE radar.collection_date >= '%s' AND radar.collection_date <= '%s' AND\
+                Intersects(radar.geom, GeomFromWKB(X'%s', 4326)))"\
+                %(boundary_polygon.wkb_hex, boundary_polygon.wkb_hex, start_time, end_time, boundary_polygon.wkb_hex)
+    db_cursor = self.db_connection.cursor()
+    db_cursor.execute(sql)
+    if db_cursor != None:
+      total = 0.0
+      date = ''
+      cnt = 0
+      for row in db_cursor:
+        percent = row['percent']
+        precip = row['precipitation']
+        total += (percent * precip)
+        cnt += 1
+      db_cursor.close()
+      if(cnt > 0):
+        weighted_avg = total
+    else:
+      weighted_avg = None
+    return(weighted_avg)
+
+
 """
 Purpose: This class is a utlity class to perform a variety of tasks on a directory with XMRG files. For the most part
 it takes files for a certain year/month and moves them to a directory corresponding to that year/month to help keep 
