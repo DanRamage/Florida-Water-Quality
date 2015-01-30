@@ -718,9 +718,12 @@ def main():
     sys.exit(-1)
   else:
     if len(options.import_data):
+      import_dirs = options.import_data.split(",")
       xmrg_proc = wqXMRGProcessing(logger=True)
       xmrg_proc.load_config_settings(config_file = options.config_file)
-      xmrg_proc.importFiles(options.import_data)
+
+      for import_dir in import_dirs:
+        xmrg_proc.importFiles(import_dir)
 
 
 if __name__ == "__main__":
