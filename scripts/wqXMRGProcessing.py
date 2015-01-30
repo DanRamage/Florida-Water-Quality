@@ -390,7 +390,7 @@ class wqXMRGProcessing(processXMRGData):
     except (ConfigParser.Error, Exception) as e:
       if self.logger is not None:
         self.logger.exception(e)
-      raise e
+      pass
 
   def load_config_settings(self, **kwargs):
     self.configSettings = configSettings(kwargs['config_file'])
