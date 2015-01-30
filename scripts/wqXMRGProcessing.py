@@ -16,9 +16,9 @@ from shapely.wkt import loads as wkt_loads
 from pykml.factory import KML_ElementMaker as KML
 from lxml import etree
 
-from dhecDB import dhecDB, nexrad_db
+from dhecDB import dhecDB
 from processXMRGFile import processXMRGData
-from xmrgFile import xmrgFile,hrapCoord,LatLong
+from xmrgFile import xmrgFile, hrapCoord, LatLong, nexrad_db
 
 class configSettings(object):
   def __init__(self, config_file):
