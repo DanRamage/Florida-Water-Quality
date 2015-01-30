@@ -744,7 +744,7 @@ class xmrgCleanup(object):
     filesOlderThan - datetime.datetime object that specifies the maximum date to keep in the self.srcDirectory. All
       older files are moved.
   """
-  def organizeFilesIntoDirectories(self, filesOlderThan=None):
+  def organizeFilesIntoDirectories(self, filesOlderThan=None, organizeByYear=True):
     fileList = os.listdir(self.srcDirectory)
     
     for fileName in fileList:      
