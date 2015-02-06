@@ -46,8 +46,11 @@ class florida_wq_data(wq_data):
   """
   def query_data(self, start_date, end_date, wq_tests_data):
     #Get the NEXRAD data for the boundaries.
-    xenia_db = wqDB(self.database_name, type(self).__name__)
 
+    self.get_nexrad_data(start_date, wq_tests_data)
+
+  def get_nexrad_data(self, start_date, wq_tests_data):
+    xenia_db = wqDB(self.database_name, type(self).__name__)
     #Collect the radar data for the boundaries.
     for boundary in self.boundaries:
       platform_handle = 'nws.%s.radarcoverage' % (boundary.name)
@@ -83,7 +86,7 @@ class florida_wq_data(wq_data):
                                                               'mm')
       if rainfall_intensity is not None:
         wq_tests_data[var_name] = rainfall_intensity
-
+    xenia_db.DB.close()
 """
 florida_sample_sites
 Overrides the default sampling_sites object so we can load the sites from the florida data.
