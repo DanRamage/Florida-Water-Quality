@@ -73,12 +73,21 @@ def main():
 
   try:
     with open(options.out_file, "w") as out_file:
+      out_file.write("WKT,NAME,BOUNDARY\n")
+      for boundary in boundaries:
+        stations = []
+        if 'station_list' in boundary:
+          stations = [station['name'] for station in boundary['station_list']]
+        out_file.write("\"%s\",\"%s\",\"%s\"\n" % (boundary['polygon'].wkt, boundary['name'], ",".join(stations)))
+    """
+    with open(options.out_file, "w") as out_file:
       out_file.write("WKT,NAME,SAMPLE_SITES\n")
       for boundary in boundaries:
         stations = []
         if 'station_list' in boundary:
           stations = [station['name'] for station in boundary['station_list']]
         out_file.write("\"%s\",\"%s\",\"%s\"\n" % (boundary['polygon'].wkt, boundary['name'], ",".join(stations)))
+    """
   except IOError, e:
     import traceback
     traceback.print_exc(e)

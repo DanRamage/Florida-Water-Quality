@@ -2,23 +2,27 @@ import sys
 sys.path.append('../commonfiles')
 
 import os
+
 import logging.config
-import time
 import optparse
 import ConfigParser
 import time
 import re
 import csv
-from pysqlite2 import dbapi2 as sqlite3
+
 from multiprocessing import Lock, Process, Queue, current_process
+
 from shapely.geometry import Polygon
 from shapely.wkt import loads as wkt_loads
+
 from pykml.factory import KML_ElementMaker as KML
 from lxml import etree
+from wqDatabase import wqDB
 
-from dhecDB import dhecDB
 from processXMRGFile import processXMRGData
+from wqHistoricalData import item_geometry
 from xmrgFile import xmrgFile, hrapCoord, LatLong, nexrad_db
+
 
 class configSettings(object):
   def __init__(self, config_file):
@@ -249,14 +253,6 @@ def process_xmrg_file(**kwargs):
                 hrap = hrapCoord(xmrg.XOR + col, xmrg.YOR + row)
                 latlon = xmrg.hrapCoordToLatLong(hrap)
                 latlon.longitude *= -1
-                """
-                use_record = False
-                if minLatLong is not None and maxLatLong is not None:
-                  if xmrg.inBBOX(latlon, minLatLong, maxLatLong):
-                    use_record = True
-                else:
-                  use_record = True
-                """
                 val = xmrg.grid[row][col]
                 #If there is no precipitation value, or the value is erroneous
                 if val <= 0:
@@ -325,24 +321,28 @@ def process_xmrg_file(**kwargs):
                 try:
                   if save_boundary_grid_cells:
                     boundary_grid_query_start = time.time()
-                    cells_cursor = nexrad_db_conn.get_radar_data_for_boundary(boundary['polygon'], filetime, filetime)
+                    #cells_cursor = nexrad_db_conn.get_radar_data_for_boundary(boundary['polygon'], filetime, filetime)
+                    cells_cursor = nexrad_db_conn.get_radar_data_for_boundary(boundary.bounding_geometry, filetime, filetime)
                     for row in cells_cursor:
                       cell_poly = wkt_loads(row['WKT'])
                       precip = row['precipitation']
-                      results.add_grid(boundary['name'], (cell_poly, precip))
+                      #results.add_grid(boundary['name'], (cell_poly, precip))
+                      results.add_grid(boundary.name, (cell_poly, precip))
 
                     if logger:
                       logger.debug("ID: %s(%f secs) to query grids for boundary: %s"\
-                                   % (current_process().name, time.time() - boundary_grid_query_start, boundary['name']))
+                                   % (current_process().name, time.time() - boundary_grid_query_start, boundary.name))
 
 
                   avg_start_time = time.time()
-                  avg = nexrad_db_conn.calculate_weighted_average(boundary['polygon'], filetime, filetime)
-                  results.add_boundary_result(boundary['name'], 'weighted_average', avg)
+                  #avg = nexrad_db_conn.calculate_weighted_average(boundary['polygon'], filetime, filetime)
+                  avg = nexrad_db_conn.calculate_weighted_average(boundary.bounding_geometry, filetime, filetime)
+                  #results.add_boundary_result(boundary['name'], 'weighted_average', avg)
+                  results.add_boundary_result(boundary.name, 'weighted_average', avg)
                   avg_total_time = time.time() - avg_start_time
                   if logger:
                     logger.debug("ID: %s(%f secs) to process average for boundary: %s"\
-                                 % (current_process().name, avg_total_time, boundary['name']))
+                                 % (current_process().name, avg_total_time, boundary.name))
                 except Exception,e:
                   if logger:
                     logger.exception(e)
@@ -368,6 +368,7 @@ def process_xmrg_file(**kwargs):
       logger.debug("ID: %s process finished. Processed: %d files in time: %f seconds"\
                    % (current_process().name, xmrg_file_count, time.time() - processing_start_time))
     return
+
 """
 Want to move away form the XML config file used and use an ini file. Create a new class
 inheritting from the dhec one.
@@ -407,23 +408,25 @@ class wqXMRGProcessing(processXMRGData):
         if line_num > 0:
           if self.logger:
             self.logger.debug("Building boundary polygon for: %s" % (row['NAME']))
-          boundary_poly = wkt_loads(row['WKT'])
-          self.boundaries.append({'name': row['NAME'], 'polygon': boundary_poly})
+          #boundary_poly = wkt_loads(row['WKT'])
+          #self.boundaries.append({'name': row['NAME'], 'polygon': boundary_poly})
+          self.boundaries.append(item_geometry(row['NAME'], row['WKT']))
         line_num += 1
 
       #Create the connection to the xenia database where our final results are stored.
-      self.xenia_db = dhecDB(self.configSettings.dbName, type(self).__name__)
+      self.xenia_db = wqDB(self.configSettings.dbName, type(self).__name__)
       if self.configSettings.add_platforms:
         org_id = self.xenia_db.organizationExists('nws')
         if org_id == -1:
           org_id =  self.xenia_db.addOrganization({'short_name': 'nws'})
         #Add the platforms to represent the watersheds and drainage basins
         for boundary in self.boundaries:
-          platform_handle = 'nws.%s.radarcoverage' % (boundary['name'])
+          #platform_handle = 'nws.%s.radarcoverage' % (boundary['name'])
+          platform_handle = 'nws.%s.radarcoverage' % (boundary.name)
           if self.xenia_db.platformExists(platform_handle) == -1:
             if self.xenia_db.addPlatform({'organization_id': org_id,
                                           'platform_handle': platform_handle,
-                                          'short_name': boundary['name'],
+                                          'short_name': boundary.name, #'short_name': boundary['name'],
                                           'active': 1}) == -1:
               self.logger.error("Failed to add platform: %s for org_id: %d, cannot continue" % (platform_handle, org_id))
 
@@ -604,6 +607,7 @@ class wqXMRGProcessing(processXMRGData):
         lon = 0.0
 
         avg = boundary_results['weighted_average']
+        #self.save_data()
         if avg != None:
           if avg > 0.0 or self.configSettings.saveAllPrecipVals:
             if avg != -9999:
@@ -623,6 +627,8 @@ class wqXMRGProcessing(processXMRGData):
                 self.sensor_ids[platform_handle] = {
                   'm_type_id': m_type_id,
                   'sensor_id': sensor_id}
+
+
               #Add the avg into the multi obs table. Since we are going to deal with the hourly data for the radar and use
               #weighted averages, instead of keeping lots of radar data in the radar table, we calc the avg and
               #store it as an obs in the multi-obs table.
@@ -662,6 +668,9 @@ class wqXMRGProcessing(processXMRGData):
         self.logger.info("Date: %s Boundary data exhausted" % (xmrg_results.datetime))
 
     return
+
+  def save_data(self):
+    return
   """
   Function: vacuumDB
   Purpose: Frees up unused space in the database.
@@ -672,7 +681,7 @@ class wqXMRGProcessing(processXMRGData):
     if self.logger is not None:
       stats = os.stat(self.configSettings.dbName)
       self.logger.debug("Begin database vacuum. File size: %d" % (stats[ST_SIZE]))
-    db = dhecDB(self.configSettings.dbSettings.dbName, None, self.logger)
+    db = wqDB(self.configSettings.dbSettings.dbName, None, self.logger)
     if(db.vacuumDB() != None):
       if self.logger is not None:
         stats = os.stat(self.configSettings.dbSettings.dbName)
