@@ -165,3 +165,19 @@ class wqDB(dhecDB):
     else:
       self.logger.error("No sensor for: precipitation_radar_weighted_average(in) found for platform: %s" %(platform_handle))
     return rainfallIntensity
+
+
+  def add_sensor_to_platform(self, platform_handle, sensor_name, uom_name, s_order=1):
+    sensor_id = dhecDB.sensorExists(self, sensor_name, uom_name, platform_handle, 1)
+    if sensor_id == -1:
+      sensor_id = dhecDB.addSensor(self,
+                                    sensor_name, uom_name,
+                                    platform_handle,
+                                    1,
+                                    0,
+                                    s_order, None, True)
+      if sensor_id == -1:
+        raise ValueError("Unable to add sensor id for Obs:%s(%s) on platform: %s" % (sensor_name,uom_name, platform_handle))
+    m_type_id = dhecDB.getMTypeFromObsName(self, sensor_name, uom_name, platform_handle, 1)
+
+    return sensor_id, m_type_id

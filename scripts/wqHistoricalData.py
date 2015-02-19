@@ -37,6 +37,17 @@ class wq_data(object):
       self.logger = logging.getLogger(type(self).__name__)
     self.station_dataset = None
 
+  """
+  Function: initialize
+  Purpose: Allows the object to be created once and reused/reinitialized.
+  """
+  def initialize(self, **kwargs):
+    return False
+
+  """
+  Function: query_data
+  Purpose: Function called to retrieve the data.
+  """
   def query_data(self, start_date, end_date):
 
     return False
