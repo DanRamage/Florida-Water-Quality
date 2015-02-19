@@ -1,15 +1,18 @@
 import sys
 sys.path.append('../commonfiles')
 
-import os
 import logging.config
-import time
-from datetime import datetime
+from datetime import datetime, timedelta
 import optparse
 import ConfigParser
 import csv
 from pytz import timezone
 import netCDF4 as nc
+from suds import WebFault
+from suds.client import Client
+
+from bisect import bisect_left
+
 from collections import OrderedDict
 
 from wqHistoricalData import wq_data
@@ -31,8 +34,19 @@ class florida_wq_data(wq_data):
   """
   def __init__(self, **kwargs):
     wq_data.__init__(self, **kwargs)
-    self.boundaries = kwargs['boundaries']
     self.database_name = kwargs['xenia_database_name']
+
+    #Connect to netcdf file for retrieving data from c10 buoy. To speed up retrieval, we connect
+    #only once and retrieve the times.
+    c10_url = 'http://tds.secoora.org/thredds/dodsC/c10_salinity_water_temp.nc'
+    self.ncObj = nc.Dataset(c10_url)
+    self.c10_times = self.ncObj.variables['time'][:]
+    self.c10_water_temp = self.ncObj.variables['temperature_04'][:]
+    self.c10_salinity = self.ncObj.variables['salinity_04'][:]
+
+  def initialize(self, **kwargs):
+    self.boundaries = kwargs['boundaries']
+
 
   """
   Function: query_data
@@ -45,9 +59,39 @@ class florida_wq_data(wq_data):
     None
   """
   def query_data(self, start_date, end_date, wq_tests_data):
-    #Get the NEXRAD data for the boundaries.
+    #dt_time = [datetime.fromtimestamp(t) for t in c10_time]
+    #strip timezone info out.
+    start_date_no_tz = start_date.replace(tzinfo=None)
+    #self.get_nws_data(start_date_no_tz, wq_tests_data)
+    self.get_thredds_data(start_date_no_tz, wq_tests_data)
+    #self.get_nexrad_data(start_date, wq_tests_data)
 
-    self.get_nexrad_data(start_date, wq_tests_data)
+  def get_nws_data(self, start_date, wq_tests_data):
+    logging.getLogger('suds.client').setLevel(logging.DEBUG)
+
+
+    wq_tests_data['nws_ksrq_avg_wspd'] = wq_defines.NO_DATA
+    wq_tests_data['nws_ksrq_avg_wdir'] = wq_defines.NO_DATA
+
+    url = 'http://www.weather.gov/forecasts/xml/DWMLgen/wsdl/ndfdXML.wsdl'
+    client = Client(url)
+    begin_date = start_date - timedelta(hours=24)
+    begin_date = datetime.strptime('2004-05-01T00:00:00', '%Y-%m-%dT%H:%M:%S')
+    start = begin_date.strftime('%Y-%m-%dT%H:%M:%S')
+    end = start_date.strftime('%Y-%m-%dT%H:%M:%S')
+    if self.logger:
+      self.logger.debug("NWS KSRQ Query for: %s to %s" % (start, end))
+
+    try:
+      data = client.service.NDFDgen(latitude=27.4, longitude=-82.57,
+                            product='time-series',
+                            start_time=start, endTime=end)
+    except WebFault, e:
+      if self.logger:
+        self.logger.exception(e)
+    else:
+      print data
+    return
 
   def get_nexrad_data(self, start_date, wq_tests_data):
     xenia_db = wqDB(self.database_name, type(self).__name__)
@@ -87,6 +131,74 @@ class florida_wq_data(wq_data):
       if rainfall_intensity is not None:
         wq_tests_data[var_name] = rainfall_intensity
     xenia_db.DB.close()
+
+  def get_thredds_data(self, start_date, wq_tests_data):
+    start_epoch_time = float(start_date.strftime('%s'))
+    #Find the starting time index to work from.
+    if self.logger:
+      self.logger.debug("Thredds C10 search for datetime: %s" % (start_date.strftime('%Y-%m-%d %H:%M:%S')))
+
+    salinity_var_name = 'c10_avg_salinity_%d' % (24)
+    wq_tests_data[salinity_var_name] = wq_defines.NO_DATA
+    wq_tests_data['c10_min_salinity'] = wq_defines.NO_DATA
+    wq_tests_data['c10_max_salinity'] = wq_defines.NO_DATA
+    water_temp_var_name = 'c10_avg_water_temp_%d' % (24)
+    wq_tests_data[water_temp_var_name] = wq_defines.NO_DATA
+    wq_tests_data['c10_min_water_temp'] = wq_defines.NO_DATA
+    wq_tests_data['c10_max_water_temp'] = wq_defines.NO_DATA
+
+    closest_start_time_idx = bisect_left(self.c10_times, start_epoch_time)
+
+
+    if (closest_start_time_idx != 0 and closest_start_time_idx != len(self.c10_times)) \
+      and (closest_start_time_idx != len(self.c10_times)):
+
+      closest_datetime = datetime.fromtimestamp(self.c10_times[closest_start_time_idx])
+      prev_hour_dt = closest_datetime - timedelta(hours=24)
+      prev_hour_epoch = float(prev_hour_dt.strftime('%s'))
+      #Get closest index for date/time for our prev_hour interval.
+      closest_prev_hour_time_idx = bisect_left(self.c10_times, prev_hour_epoch)
+
+      if self.logger:
+        self.logger.debug("Thredds C10 found closest datetime: %s" % (closest_datetime.strftime('%Y-%m-%d %H:%M:%S')))
+      #for prev_hours in range(24, 24, 24):
+
+      rec_cnt = closest_start_time_idx-closest_prev_hour_time_idx
+      avg_c10_salinity = 0
+      min_sal = None
+      max_sal = None
+      avg_c10_wt = 0
+      min_temp = None
+      max_temp = None
+      for ndx in range(closest_prev_hour_time_idx, closest_start_time_idx):
+        avg_c10_salinity += self.c10_salinity[ndx]
+        if min_sal is None or min_sal > self.c10_salinity[ndx]:
+          min_sal = self.c10_salinity[ndx]
+        if max_sal is None or max_sal < self.c10_salinity[ndx]:
+          max_sal = self.c10_salinity[ndx]
+
+        avg_c10_wt += self.c10_water_temp[ndx]
+        if min_temp is None or min_temp > self.c10_water_temp[ndx]:
+          min_temp = self.c10_water_temp[ndx]
+        if max_sal is None or max_temp < self.c10_water_temp[ndx]:
+          max_temp = self.c10_water_temp[ndx]
+      if rec_cnt > 0:
+        avg_c10_salinity = avg_c10_salinity / rec_cnt
+        avg_c10_wt = avg_c10_wt / rec_cnt
+        wq_tests_data['c10_avg_salinity_24'] = avg_c10_salinity
+        wq_tests_data['c10_avg_water_temp_24'] = avg_c10_wt
+
+        wq_tests_data['c10_min_salinity'] = min_sal
+        wq_tests_data['c10_max_salinity'] = max_sal
+        wq_tests_data['c10_min_water_temp'] = min_temp
+        wq_tests_data['c10_max_water_temp'] = max_temp
+
+        if self.logger:
+          self.logger.debug("Thredds C10 Start: %s End: %s Avg Salinity: %f (%f,%f) Avg Water Temp: %f (%f,%f)"\
+                            % (start_date.strftime('%Y-%m-%d %H:%M:%S'), prev_hour_dt.strftime('%Y-%m-%d %H:%M:%S'),
+                               avg_c10_salinity, min_sal, max_sal, avg_c10_wt, min_temp, max_temp))
+    return
+
 """
 florida_sample_sites
 Overrides the default sampling_sites object so we can load the sites from the florida data.
@@ -182,6 +294,9 @@ def create_historical_summary(config_file,
 
       stop_date = eastern.localize(datetime.strptime('2014-01-29 00:00:00', '%Y-%m-%d %H:%M:%S'))
       stop_date = stop_date.astimezone(timezone('UTC'))
+
+      fl_wq_data = florida_wq_data(xenia_database_name=xenia_db_file, use_logger=True)
+
       for row in wq_history_file:
         #Check to see if the site is one we are using
         if line_num > 0:
@@ -197,8 +312,9 @@ def create_historical_summary(config_file,
               current_site = cleaned_site_name
 
               #We need to create a new data access object using the boundaries for the station.
-              site = fl_sites.get_site(row['SPLocation'])
-              fl_wq_data = florida_wq_data(boundaries=site.contained_by, xenia_database_name=xenia_db_file, use_logger=True)
+              site = fl_sites.get_site(cleaned_site_name)
+
+              fl_wq_data.initialize(boundaries=site.contained_by)
 
               clean_filename = cleaned_site_name.replace(' ', '_')
               sample_site_filename = "%s/%s-Historical.csv" % (summary_out_file, clean_filename)
