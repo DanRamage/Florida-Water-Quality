@@ -2,23 +2,24 @@ import sys
 sys.path.append('../commonfiles')
 
 import logging.config
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
+from pytz import timezone
 import optparse
 import ConfigParser
 import csv
-from pytz import timezone
 import netCDF4 as nc
 from suds import WebFault
 from suds.client import Client
-
-from bisect import bisect_left
+from math import isnan
+from bisect import bisect_left, bisect_right
 
 from collections import OrderedDict
 
 from wqHistoricalData import wq_data
 from wqXMRGProcessing import wqDB
 from wqHistoricalData import station_geometry, item_geometry, sampling_sites, wq_defines, geometry_list
-
+from date_time_utils import get_utc_epoch
+from NOAATideData import noaaTideData
 """
 florida_wq_data
 Class is responsible for retrieving the data used for the sample sites models.
@@ -34,19 +35,26 @@ class florida_wq_data(wq_data):
   """
   def __init__(self, **kwargs):
     wq_data.__init__(self, **kwargs)
-    self.database_name = kwargs['xenia_database_name']
 
     #Connect to netcdf file for retrieving data from c10 buoy. To speed up retrieval, we connect
     #only once and retrieve the times.
-    c10_url = 'http://tds.secoora.org/thredds/dodsC/c10_salinity_water_temp.nc'
-    self.ncObj = nc.Dataset(c10_url)
+    self.ncObj = nc.Dataset(kwargs['c_10_tds_url'])
     self.c10_times = self.ncObj.variables['time'][:]
     self.c10_water_temp = self.ncObj.variables['temperature_04'][:]
     self.c10_salinity = self.ncObj.variables['salinity_04'][:]
 
+    self.xenia_db = wqDB(kwargs['xenia_database_name'], type(self).__name__)
+
+  def __del__(self):
+    self.xenia_db.DB.close()
+    self.ncObj.close()
+
   def initialize(self, **kwargs):
     self.boundaries = kwargs['boundaries']
-
+    #The main station we retrieve the values from.
+    self.tide_station = kwargs['tide_station']
+    #These are the settings to correct the tide for the subordinate station.
+    self.tide_offset_settings = kwargs['tide_offset_params']
 
   """
   Function: query_data
@@ -61,40 +69,86 @@ class florida_wq_data(wq_data):
   def query_data(self, start_date, end_date, wq_tests_data):
     #dt_time = [datetime.fromtimestamp(t) for t in c10_time]
     #strip timezone info out.
-    start_date_no_tz = start_date.replace(tzinfo=None)
-    #self.get_nws_data(start_date_no_tz, wq_tests_data)
-    self.get_thredds_data(start_date_no_tz, wq_tests_data)
+    #start_date_no_tz = start_date.replace(tzinfo=None)
+    #self.get_nws_data(start_date, wq_tests_data)
+    #self.get_thredds_data(start_date, wq_tests_data)
     #self.get_nexrad_data(start_date, wq_tests_data)
+    self.get_tide_data(start_date, wq_tests_data)
+
+  def get_tide_data(self, start_date, wq_tests_data):
+    if self.logger:
+      self.logger.debug("Retrieving tide data for station: %s date: %s" % (self.tide_station, start_date))
+
+    tide = noaaTideData(logger=self.logger)
+    #Date/Time format for the NOAA is YYYYMMDD
+    #Build variables for the base tide station.
+    var_name = '%s_tide_range' % (self.tide_station)
+    wq_tests_data[var_name] = wq_defines.NO_DATA
+    var_name = '%s_tide_hi' % (self.tide_station)
+    wq_tests_data[var_name] = wq_defines.NO_DATA
+    var_name = '%s_tide_lo' % (self.tide_station)
+    wq_tests_data[var_name] = wq_defines.NO_DATA
+    #Build variables for the subordinate tide station.
+    var_name = '%s_tide_range' % (self.tide_offset_settings['tide_station'])
+    wq_tests_data[var_name] = wq_defines.NO_DATA
+    var_name = '%s_tide_hi' % (self.tide_offset_settings['tide_station'])
+    wq_tests_data[var_name] = wq_defines.NO_DATA
+    var_name = '%s_tide_lo' % (self.tide_offset_settings['tide_station'])
+    wq_tests_data[var_name] = wq_defines.NO_DATA
+
+
+    tide_data = tide.calcTideRange(beginDate = start_date.strftime('%Y%m%d'),
+                       endDate = start_date.strftime('%Y%m%d'),
+                       station=self.tide_station,
+                       datum='MLLW',
+                       units='feet',
+                       timezone='GMT',
+                       smoothData=False)
+    if tide_data and tide_data['HH']['value'] is not None and tide_data['LL']['value'] is not None:
+      range = tide_data['HH']['value'] - tide_data['LL']['value']
+      #Save tide station values.
+      tide_station = self.tide_station
+      var_name = '%s_tide_range' % (tide_station)
+      wq_tests_data[var_name] = range
+      var_name = '%s_tide_hi' % (tide_station)
+      wq_tests_data[var_name] = tide_data['HH']['value']
+      var_name = '%s_tide_lo' % (tide_station)
+      wq_tests_data[var_name] = tide_data['LL']['value']
+
+      #Save subordinate station values
+      offset_hi = tide_data['HH']['value'] * self.tide_offset_settings['hi_tide_height_offset']
+      offset_lo = tide_data['LL']['value'] * self.tide_offset_settings['lo_tide_height_offset']
+      tide_station = self.tide_offset_settings['tide_station']
+      var_name = '%s_tide_range' % (tide_station)
+      wq_tests_data[var_name] = offset_hi - offset_lo
+      var_name = '%s_tide_hi' % (tide_station)
+      wq_tests_data[var_name] = offset_hi
+      var_name = '%s_tide_lo' % (tide_station)
+      wq_tests_data[var_name] = offset_lo
+    else:
+      if self.logger:
+        self.logger.error("Tide data for station: %s date: %s not available or only partial." % (self.tide_station, start_date))
+    return
 
   def get_nws_data(self, start_date, wq_tests_data):
-    logging.getLogger('suds.client').setLevel(logging.DEBUG)
-
 
     wq_tests_data['nws_ksrq_avg_wspd'] = wq_defines.NO_DATA
     wq_tests_data['nws_ksrq_avg_wdir'] = wq_defines.NO_DATA
+    platform_handle = 'nws.ksrq.met'
 
-    url = 'http://www.weather.gov/forecasts/xml/DWMLgen/wsdl/ndfdXML.wsdl'
-    client = Client(url)
-    begin_date = start_date - timedelta(hours=24)
-    begin_date = datetime.strptime('2004-05-01T00:00:00', '%Y-%m-%dT%H:%M:%S')
-    start = begin_date.strftime('%Y-%m-%dT%H:%M:%S')
-    end = start_date.strftime('%Y-%m-%dT%H:%M:%S')
-    if self.logger:
-      self.logger.debug("NWS KSRQ Query for: %s to %s" % (start, end))
+    end_date_str = start_date.strftime('%Y-%m-%dT%H:%M:%S')
+    stop_data = start_date - timedelta(hours=24)
+    begin_date_str = stop_data.strftime('%Y-%m-%dT%H:%M:%S')
+    avgWindComponents = self.xenia_db.calcAvgWindSpeedAndDir(platform_handle,
+                                         'wind_speed', 'mph', 'wind_from_direction', 'degrees_true',
+                                         begin_date_str, end_date_str)
+    if avgWindComponents[1][0] != None and avgWindComponents[1][1] != None:
+      wq_tests_data['nws_ksrq_avg_wspd'] = avgWindComponents[1][0]
+      wq_tests_data['nws_ksrq_avg_wdir'] = avgWindComponents[1][1]
 
-    try:
-      data = client.service.NDFDgen(latitude=27.4, longitude=-82.57,
-                            product='time-series',
-                            start_time=start, endTime=end)
-    except WebFault, e:
-      if self.logger:
-        self.logger.exception(e)
-    else:
-      print data
     return
 
   def get_nexrad_data(self, start_date, wq_tests_data):
-    xenia_db = wqDB(self.database_name, type(self).__name__)
     #Collect the radar data for the boundaries.
     for boundary in self.boundaries:
       platform_handle = 'nws.%s.radarcoverage' % (boundary.name)
@@ -102,7 +156,7 @@ class florida_wq_data(wq_data):
       for prev_hours in range(24, 192, 24):
         var_name = '%s_summary_%d' % (boundary.name.lower().replace(' ', '_'), prev_hours)
         wq_tests_data[var_name] = wq_defines.NO_DATA
-        radar_val = xenia_db.getLastNHoursSummaryFromRadarPrecip(platform_handle,
+        radar_val = self.xenia_db.getLastNHoursSummaryFromRadarPrecip(platform_handle,
                                                                     start_date,
                                                                     prev_hours,
                                                                     'precipitation_radar_weighted_average',
@@ -111,10 +165,10 @@ class florida_wq_data(wq_data):
           wq_tests_data[var_name] = radar_val
         else:
           if self.logger:
-            self.logger.error("No data available for boundary: %s Date: %s. Error: %s" %(var_name, start_date, xenia_db.getErrorInfo()))
+            self.logger.error("No data available for boundary: %s Date: %s. Error: %s" %(var_name, start_date, self.xenia_db.getErrorInfo()))
       var_name = '%s_dry_days_count' % (boundary.name.lower().replace(' ', '_'))
       wq_tests_data[var_name] = wq_defines.NO_DATA
-      prev_dry_days = xenia_db.getPrecedingRadarDryDaysCount(platform_handle,
+      prev_dry_days = self.xenia_db.getPrecedingRadarDryDaysCount(platform_handle,
                                              start_date,
                                              'precipitation_radar_weighted_average',
                                              'mm')
@@ -123,80 +177,98 @@ class florida_wq_data(wq_data):
 
       var_name = '%s_rainfall_intesity' % (boundary.name.lower().replace(' ', '_'))
       wq_tests_data[var_name] = wq_defines.NO_DATA
-      rainfall_intensity = xenia_db.calcRadarRainfallIntensity(platform_handle,
+      rainfall_intensity = self.xenia_db.calcRadarRainfallIntensity(platform_handle,
                                                                start_date,
                                                                60,
                                                               'precipitation_radar_weighted_average',
                                                               'mm')
       if rainfall_intensity is not None:
         wq_tests_data[var_name] = rainfall_intensity
-    xenia_db.DB.close()
 
   def get_thredds_data(self, start_date, wq_tests_data):
-    start_epoch_time = float(start_date.strftime('%s'))
+    start_epoch_time = int(get_utc_epoch(start_date) + 0.5)
+
     #Find the starting time index to work from.
     if self.logger:
       self.logger.debug("Thredds C10 search for datetime: %s" % (start_date.strftime('%Y-%m-%d %H:%M:%S')))
 
     salinity_var_name = 'c10_avg_salinity_%d' % (24)
     wq_tests_data[salinity_var_name] = wq_defines.NO_DATA
+    wq_tests_data['c10_salinity_rec_cnt'] = wq_defines.NO_DATA
     wq_tests_data['c10_min_salinity'] = wq_defines.NO_DATA
     wq_tests_data['c10_max_salinity'] = wq_defines.NO_DATA
     water_temp_var_name = 'c10_avg_water_temp_%d' % (24)
     wq_tests_data[water_temp_var_name] = wq_defines.NO_DATA
+    wq_tests_data['c10_water_temp_rec_cnt'] = wq_defines.NO_DATA
     wq_tests_data['c10_min_water_temp'] = wq_defines.NO_DATA
     wq_tests_data['c10_max_water_temp'] = wq_defines.NO_DATA
 
     closest_start_time_idx = bisect_left(self.c10_times, start_epoch_time)
-
+    c10_val = int(self.c10_times[closest_start_time_idx-1] + 0.5)
+    if start_epoch_time == c10_val:
+      closest_start_time_idx -= 1
 
     if (closest_start_time_idx != 0 and closest_start_time_idx != len(self.c10_times)) \
       and (closest_start_time_idx != len(self.c10_times)):
 
-      closest_datetime = datetime.fromtimestamp(self.c10_times[closest_start_time_idx])
+      closest_datetime = datetime.fromtimestamp(self.c10_times[closest_start_time_idx], timezone('UTC'))
       prev_hour_dt = closest_datetime - timedelta(hours=24)
-      prev_hour_epoch = float(prev_hour_dt.strftime('%s'))
+      prev_hour_epoch = int(get_utc_epoch(prev_hour_dt) + 0.5)
       #Get closest index for date/time for our prev_hour interval.
       closest_prev_hour_time_idx = bisect_left(self.c10_times, prev_hour_epoch)
 
       if self.logger:
-        self.logger.debug("Thredds C10 found closest datetime: %s" % (closest_datetime.strftime('%Y-%m-%d %H:%M:%S')))
+        self.logger.debug("Thredds C10 closest Starting datetime: %s Ending Datetime: %s"\
+                          % (closest_datetime.strftime('%Y-%m-%d %H:%M:%S'),
+                             datetime.fromtimestamp(self.c10_times[closest_prev_hour_time_idx], timezone('UTC')).strftime('%Y-%m-%d %H:%M:%S')))
       #for prev_hours in range(24, 24, 24):
 
       rec_cnt = closest_start_time_idx-closest_prev_hour_time_idx
+      if rec_cnt > 24 or rec_cnt < 12:
+        if self.logger:
+          self.logger.error("Thredds record counts are suspect: %d" % (rec_cnt))
       avg_c10_salinity = 0
+      sal_rec_cnt = 0
       min_sal = None
       max_sal = None
       avg_c10_wt = 0
+      temp_rec_cnt = 0
       min_temp = None
       max_temp = None
       for ndx in range(closest_prev_hour_time_idx, closest_start_time_idx):
-        avg_c10_salinity += self.c10_salinity[ndx]
-        if min_sal is None or min_sal > self.c10_salinity[ndx]:
-          min_sal = self.c10_salinity[ndx]
-        if max_sal is None or max_sal < self.c10_salinity[ndx]:
-          max_sal = self.c10_salinity[ndx]
-
-        avg_c10_wt += self.c10_water_temp[ndx]
-        if min_temp is None or min_temp > self.c10_water_temp[ndx]:
-          min_temp = self.c10_water_temp[ndx]
-        if max_sal is None or max_temp < self.c10_water_temp[ndx]:
-          max_temp = self.c10_water_temp[ndx]
-      if rec_cnt > 0:
-        avg_c10_salinity = avg_c10_salinity / rec_cnt
-        avg_c10_wt = avg_c10_wt / rec_cnt
+        if not isnan(self.c10_salinity[ndx]):
+          avg_c10_salinity += self.c10_salinity[ndx]
+          if min_sal is None or min_sal > self.c10_salinity[ndx]:
+            min_sal = self.c10_salinity[ndx]
+          if max_sal is None or max_sal < self.c10_salinity[ndx]:
+            max_sal = self.c10_salinity[ndx]
+          sal_rec_cnt += 1
+        if not isnan(self.c10_water_temp[ndx]):
+          avg_c10_wt += self.c10_water_temp[ndx]
+          if min_temp is None or min_temp > self.c10_water_temp[ndx]:
+            min_temp = self.c10_water_temp[ndx]
+          if max_sal is None or max_temp < self.c10_water_temp[ndx]:
+            max_temp = self.c10_water_temp[ndx]
+          temp_rec_cnt += 1
+      if sal_rec_cnt > 0:
+        avg_c10_salinity = avg_c10_salinity / sal_rec_cnt
         wq_tests_data['c10_avg_salinity_24'] = avg_c10_salinity
-        wq_tests_data['c10_avg_water_temp_24'] = avg_c10_wt
-
+        wq_tests_data['c10_salinity_rec_cnt'] = sal_rec_cnt
         wq_tests_data['c10_min_salinity'] = min_sal
         wq_tests_data['c10_max_salinity'] = max_sal
+
+      if temp_rec_cnt > 0:
+        avg_c10_wt = avg_c10_wt / temp_rec_cnt
+        wq_tests_data['c10_avg_water_temp_24'] = avg_c10_wt
+        wq_tests_data['c10_water_temp_rec_cnt'] = temp_rec_cnt
         wq_tests_data['c10_min_water_temp'] = min_temp
         wq_tests_data['c10_max_water_temp'] = max_temp
 
         if self.logger:
-          self.logger.debug("Thredds C10 Start: %s End: %s Avg Salinity: %f (%f,%f) Avg Water Temp: %f (%f,%f)"\
+          self.logger.debug("Thredds C10 Start: %s End: %s Avg Salinity: %s (%s,%s) Avg Water Temp: %s (%s,%s)"\
                             % (start_date.strftime('%Y-%m-%d %H:%M:%S'), prev_hour_dt.strftime('%Y-%m-%d %H:%M:%S'),
-                               avg_c10_salinity, min_sal, max_sal, avg_c10_wt, min_temp, max_temp))
+                               str(avg_c10_salinity), str(min_sal), str(max_sal),
+                               str(avg_c10_wt), str(min_temp), str(max_temp)))
     return
 
 """
@@ -257,16 +329,21 @@ class florida_sample_sites(sampling_sites):
     return False
 
 
-def create_historical_summary(config_file,
+def create_historical_summary(config_file_name,
                               historical_wq_file,
                               header_row,
                               summary_out_file,
                               use_logger=False):
   logger = None
   try:
+    config_file = ConfigParser.RawConfigParser()
+    config_file.read(config_file_name)
+
     boundaries_location_file = config_file.get('boundaries_settings', 'boundaries_file')
     sites_location_file = config_file.get('boundaries_settings', 'sample_sites')
     xenia_db_file = config_file.get('database', 'name')
+    c_10_tds_url = config_file.get('c10_data', 'historical_qaqc_thredds')
+
   except ConfigParser, e:
     if logger:
       logger.exception(e)
@@ -295,7 +372,9 @@ def create_historical_summary(config_file,
       stop_date = eastern.localize(datetime.strptime('2014-01-29 00:00:00', '%Y-%m-%d %H:%M:%S'))
       stop_date = stop_date.astimezone(timezone('UTC'))
 
-      fl_wq_data = florida_wq_data(xenia_database_name=xenia_db_file, use_logger=True)
+      fl_wq_data = florida_wq_data(xenia_database_name=xenia_db_file,
+                                   c_10_tds_url=c_10_tds_url,
+                                   use_logger=True)
 
       for row in wq_history_file:
         #Check to see if the site is one we are using
@@ -313,8 +392,22 @@ def create_historical_summary(config_file,
 
               #We need to create a new data access object using the boundaries for the station.
               site = fl_sites.get_site(cleaned_site_name)
+              #Get the station specific tide stations
+              try:
+                tide_station = config_file.get(cleaned_site_name, 'tide_station')
+                offset_tide_station = config_file.get(cleaned_site_name, 'offset_tide_station')
+                tide_offset_settings = {
+                  'tide_station': config_file.get(offset_tide_station, 'station_id'),
+                  'hi_tide_time_offset': config_file.getint(offset_tide_station, 'hi_tide_time_offset'),
+                  'lo_tide_time_offset': config_file.getint(offset_tide_station, 'lo_tide_time_offset'),
+                  'hi_tide_height_offset': config_file.getfloat(offset_tide_station, 'hi_tide_height_offset'),
+                  'lo_tide_height_offset': config_file.getfloat(offset_tide_station, 'lo_tide_height_offset')
+                }
+              except ConfigParser.Error, e:
+                if self.logger:
+                  self.logger.exception(e)
 
-              fl_wq_data.initialize(boundaries=site.contained_by)
+              fl_wq_data.initialize(boundaries=site.contained_by, tide_station=tide_station, tide_offset_params=tide_offset_settings)
 
               clean_filename = cleaned_site_name.replace(' ', '_')
               sample_site_filename = "%s/%s-Historical.csv" % (summary_out_file, clean_filename)
@@ -435,7 +528,7 @@ def main():
     sys.exit(-1)
   else:
     if options.build_summary_data:
-      create_historical_summary(configFile,
+      create_historical_summary(options.config_file,
                                 options.historical_wq_file,
                                 options.historical_file_header_row.split(','),
                                 options.summary_out_path,
