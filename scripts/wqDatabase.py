@@ -4,6 +4,7 @@ sys.path.append('../commonfiles')
 from pysqlite2 import dbapi2 as sqlite3
 from dhecDB import dhecDB
 from datetime import datetime, timedelta
+from stats import vectorMagDir
 
 class wqDB(dhecDB):
   """
@@ -181,3 +182,109 @@ class wqDB(dhecDB):
     m_type_id = dhecDB.getMTypeFromObsName(self, sensor_name, uom_name, platform_handle, 1)
 
     return sensor_id, m_type_id
+
+  """
+  Function: calcAvgWindSpeedAndDir
+  Purpose: Wind direction is measured from 0-360 degrees, so around the inflection point trying to do an average can
+  have bad results. For instance 250 degrees and 4 degrees are roughly in the same direction, but doing a straight
+  average will result in something nowhere near correct. This function takes the speed and direction and converts
+  to a vector.
+  Parameters:
+    platName - String representing the platform name to query
+    startDate the date/time to start the average
+    endDate the date/time to stop the average
+  Returns:
+    A tuple setup to contain [0][0] = the vector speed and [0][1] direction average
+      [1][0] - Scalar speed average [1][1] - vector direction average with unity speed used.
+  """
+  def calcAvgWindSpeedAndDir(self, platName, wind_speed_obsname, wind_speed_uom, wind_dir_obsname, wind_dir_uom, startDate, endDate):
+    windComponents = []
+    dirComponents = []
+    vectObj = vectorMagDir();
+    #Get the wind speed and direction so we can correctly average the data.
+    #Get the sensor ID for the obs we are interested in so we can use it to query the data.
+    windSpdId = dhecDB.sensorExists(self, wind_speed_obsname, wind_speed_uom, platName)
+    windDirId = dhecDB.sensorExists(self, wind_dir_obsname, wind_dir_uom, platName)
+    spd_sql = "SELECT m_date ,m_value FROM multi_obs\
+           WHERE sensor_id = %d AND\
+           (m_date >= '%s' AND \
+           m_date < '%s' ) ORDER BY m_date"\
+          %(windSpdId, startDate, endDate)
+    if(self.logger):
+      self.logger.debug("Wind Speed SQL: %s" % (spd_sql))
+
+    dir_sql = "SELECT m_date ,m_value FROM multi_obs\
+           WHERE sensor_id = %d AND\
+           (m_date >= '%s' AND \
+           m_date < '%s' ) ORDER BY m_date"\
+          %(windDirId, startDate, endDate)
+    if(self.logger):
+      self.logger.debug("Wind Dir SQL: %s" % (dir_sql))
+    try:
+      windSpdCursor = self.DB.cursor()
+      windSpdCursor.execute(spd_sql)
+      windDirCursor = self.DB.cursor()
+      windDirCursor.execute(dir_sql)
+    except sqlite3.Error, e:
+      if self.logger:
+        self.logger.exception(e)
+    else:
+      scalarSpd = None
+      spdCnt = 0
+      for spdRow in windSpdCursor:
+        if scalarSpd == None:
+          scalarSpd = 0
+        scalarSpd += spdRow['m_value']
+        spdCnt += 1
+        for dirRow in windDirCursor:
+          if spdRow['m_date'] == dirRow['m_date']:
+            if self.logger:
+              self.logger.debug("Calculating vector for Speed(%s): %f Dir(%s): %f" % (spdRow['m_date'], spdRow['m_value'], dirRow['m_date'], dirRow['m_value']))
+            #Vector using both speed and direction.
+            windComponents.append(vectObj.calcVector(spdRow['m_value'], dirRow['m_value']))
+            #VEctor with speed as constant(1), and direction.
+            dirComponents.append(vectObj.calcVector(1, dirRow['m_value']))
+            break
+      #Get our average on the east and north components of the wind vector.
+      spdAvg = None
+      dirAvg = None
+      scalarSpdAvg = None
+      vectorDirAvg = None
+
+      #If we have the direction only components, this is unity speed with wind direction, calc the averages.
+      if len(dirComponents):
+        eastCompAvg = 0
+        northCompAvg = 0
+        scalarSpdAvg = scalarSpd / spdCnt
+
+        for vectorTuple in dirComponents:
+          eastCompAvg += vectorTuple[0]
+          northCompAvg += vectorTuple[1]
+
+        eastCompAvg = eastCompAvg / len(dirComponents)
+        northCompAvg = northCompAvg / len(dirComponents)
+        spdAvg,vectorDirAvg = vectObj.calcMagAndDir(eastCompAvg, northCompAvg)
+        if self.logger:
+          self.logger.debug("Platform: %s Scalar Speed Avg: %f Vector Dir Avg: %f" % (platName,scalarSpdAvg,vectorDirAvg))
+
+      #2013-11-21 DWR Add check to verify we have components. Also reset the eastCompAvg and northCompAvg to 0
+      #before doing calcs.
+      #If we have speed and direction vectors, calc the averages.
+      if len(windComponents):
+        eastCompAvg = 0
+        northCompAvg = 0
+        for vectorTuple in windComponents:
+          eastCompAvg += vectorTuple[0]
+          northCompAvg += vectorTuple[1]
+
+        eastCompAvg = eastCompAvg / len(windComponents)
+        northCompAvg = northCompAvg / len(windComponents)
+        #Calculate average with speed and direction components.
+        spdAvg,dirAvg = vectObj.calcMagAndDir(eastCompAvg, northCompAvg)
+        if(self.logger):
+          self.logger.debug("Platform: %s Vector Speed Avg: %f Vector Dir Avg: %f" % (platName,spdAvg,dirAvg))
+
+      windSpdCursor.close()
+      windDirCursor.close()
+
+    return (spdAvg, dirAvg), (scalarSpdAvg, vectorDirAvg)
