@@ -322,7 +322,7 @@ def process_xmrg_file(**kwargs):
                   if save_boundary_grid_cells:
                     boundary_grid_query_start = time.time()
                     #cells_cursor = nexrad_db_conn.get_radar_data_for_boundary(boundary['polygon'], filetime, filetime)
-                    cells_cursor = nexrad_db_conn.get_radar_data_for_boundary(boundary.bounding_geometry, filetime, filetime)
+                    cells_cursor = nexrad_db_conn.get_radar_data_for_boundary(boundary.object_geometry, filetime, filetime)
                     for row in cells_cursor:
                       cell_poly = wkt_loads(row['WKT'])
                       precip = row['precipitation']
@@ -336,7 +336,7 @@ def process_xmrg_file(**kwargs):
 
                   avg_start_time = time.time()
                   #avg = nexrad_db_conn.calculate_weighted_average(boundary['polygon'], filetime, filetime)
-                  avg = nexrad_db_conn.calculate_weighted_average(boundary.bounding_geometry, filetime, filetime)
+                  avg = nexrad_db_conn.calculate_weighted_average(boundary.object_geometry, filetime, filetime)
                   #results.add_boundary_result(boundary['name'], 'weighted_average', avg)
                   results.add_boundary_result(boundary.name, 'weighted_average', avg)
                   avg_total_time = time.time() - avg_start_time
@@ -380,7 +380,7 @@ class wqXMRGProcessing(processXMRGData):
     if logger:
       self.logger = logging.getLogger(type(self).__name__)
       self.xenia_db = None
-      self.boundaries = geometry_list() #[]
+      self.boundaries = geometry_list(use_logger=True) #[]
       self.sensor_ids = {}
     try:
       #2011-07-25 DWR
