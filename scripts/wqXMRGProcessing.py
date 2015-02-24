@@ -20,7 +20,7 @@ from lxml import etree
 from wqDatabase import wqDB
 
 from processXMRGFile import processXMRGData
-from wqHistoricalData import item_geometry
+from wqHistoricalData import item_geometry, geometry_list
 from xmrgFile import xmrgFile, hrapCoord, LatLong, nexrad_db
 
 
@@ -380,7 +380,7 @@ class wqXMRGProcessing(processXMRGData):
     if logger:
       self.logger = logging.getLogger(type(self).__name__)
       self.xenia_db = None
-      self.boundaries = []
+      self.boundaries = geometry_list() #[]
       self.sensor_ids = {}
     try:
       #2011-07-25 DWR
@@ -401,6 +401,8 @@ class wqXMRGProcessing(processXMRGData):
       if self.logger:
         self.logger.debug("Reading boundaries geometry file: %s" % (self.configSettings.boundaries_file))
 
+      self.boundaries.load(self.configSettings.boundaries_file)
+      """
       geometry_file = open(self.configSettings.boundaries_file, "rU")
       dict_file = csv.DictReader(geometry_file, delimiter=',', quotechar='"', fieldnames=header_row)
       line_num = 0
@@ -412,7 +414,7 @@ class wqXMRGProcessing(processXMRGData):
           #self.boundaries.append({'name': row['NAME'], 'polygon': boundary_poly})
           self.boundaries.append(item_geometry(row['NAME'], row['WKT']))
         line_num += 1
-
+      """
       #Create the connection to the xenia database where our final results are stored.
       self.xenia_db = wqDB(self.configSettings.dbName, type(self).__name__)
       if self.configSettings.add_platforms:
