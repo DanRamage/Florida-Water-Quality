@@ -18,7 +18,6 @@ from wqXMRGProcessing import wqDB
 from wqHistoricalData import station_geometry,sampling_sites, wq_defines, geometry_list
 from date_time_utils import get_utc_epoch
 from NOAATideData import noaaTideData
-
 """
 florida_wq_data
 Class is responsible for retrieving the data used for the sample sites models.
@@ -52,6 +51,7 @@ class florida_wq_data(wq_data):
     if self.logger:
       self.logger.debug("Closing connection to xenia db")
     self.xenia_db.DB.close()
+
     if self.logger:
       self.logger.debug("Closing connection to thredds endpoint.")
     self.ncObj.close()
@@ -201,6 +201,7 @@ class florida_wq_data(wq_data):
       platform_handle = 'nws.%s.radarcoverage' % (boundary.name)
       # Get the radar data for previous 8 days in 24 hour intervals
       for prev_hours in range(24, 192, 24):
+        var_name = '%s_summary_%d' % (boundary.name.lower().replace(' ', '_'), prev_hours)
         radar_val = self.xenia_db.getLastNHoursSummaryFromRadarPrecip(platform_handle,
                                                                     start_date,
                                                                     prev_hours,
@@ -216,6 +217,7 @@ class florida_wq_data(wq_data):
                                              'precipitation_radar_weighted_average',
                                              'mm')
       if prev_dry_days is not None:
+        var_name = '%s_dry_days_count' % (boundary.name.lower().replace(' ', '_'))
         wq_tests_data[var_name] = prev_dry_days
 
       rainfall_intensity = self.xenia_db.calcRadarRainfallIntensity(platform_handle,
@@ -224,6 +226,7 @@ class florida_wq_data(wq_data):
                                                               'precipitation_radar_weighted_average',
                                                               'mm')
       if rainfall_intensity is not None:
+        var_name = '%s_rainfall_intesity' % (boundary.name.lower().replace(' ', '_'))
         wq_tests_data[var_name] = rainfall_intensity
 
   def get_thredds_data(self, start_date, wq_tests_data):
@@ -435,8 +438,8 @@ def create_historical_summary(config_file_name,
                   'lo_tide_height_offset': config_file.getfloat(offset_tide_station, 'lo_tide_height_offset')
                 }
               except ConfigParser.Error, e:
-                if self.logger:
-                  self.logger.exception(e)
+                if logger:
+                  logger.exception(e)
 
               fl_wq_data.initialize(boundaries=site.contained_by, tide_station=tide_station, tide_offset_params=tide_offset_settings)
 
