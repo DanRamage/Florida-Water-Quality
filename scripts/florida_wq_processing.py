@@ -67,6 +67,7 @@ class florida_wq_data(wq_data):
     None
   """
   def query_data(self, start_date, end_date, wq_tests_data):
+    self.initialize_return_data(wq_tests_data)
     #dt_time = [datetime.fromtimestamp(t) for t in c10_time]
     #strip timezone info out.
     #start_date_no_tz = start_date.replace(tzinfo=None)
@@ -74,13 +75,16 @@ class florida_wq_data(wq_data):
     #self.get_thredds_data(start_date, wq_tests_data)
     #self.get_nexrad_data(start_date, wq_tests_data)
     self.get_tide_data(start_date, wq_tests_data)
-
-  def get_tide_data(self, start_date, wq_tests_data):
-    if self.logger:
-      self.logger.debug("Retrieving tide data for station: %s date: %s" % (self.tide_station, start_date))
-
-    tide = noaaTideData(logger=self.logger)
-    #Date/Time format for the NOAA is YYYYMMDD
+  """
+  Function: initialize_return_data
+  Purpose: INitialize our ordered dict with the data variables and assign a NO_DATA
+    initial value.
+  Parameters:
+    wq_tests_data - An OrderedDict that is initialized.
+  Return:
+    None
+  """
+  def initialize_return_data(self, wq_tests_data):
     #Build variables for the base tide station.
     var_name = '%s_tide_range' % (self.tide_station)
     wq_tests_data[var_name] = wq_defines.NO_DATA
@@ -95,6 +99,39 @@ class florida_wq_data(wq_data):
     wq_tests_data[var_name] = wq_defines.NO_DATA
     var_name = '%s_tide_lo' % (self.tide_offset_settings['tide_station'])
     wq_tests_data[var_name] = wq_defines.NO_DATA
+
+    wq_tests_data['nws_ksrq_avg_wspd'] = wq_defines.NO_DATA
+    wq_tests_data['nws_ksrq_avg_wdir'] = wq_defines.NO_DATA
+
+    for boundary in self.boundaries:
+      for prev_hours in range(24, 192, 24):
+        var_name = '%s_summary_%d' % (boundary.name.lower().replace(' ', '_'), prev_hours)
+        wq_tests_data[var_name] = wq_defines.NO_DATA
+
+      var_name = '%s_dry_days_count' % (boundary.name.lower().replace(' ', '_'))
+      wq_tests_data[var_name] = wq_defines.NO_DATA
+
+      var_name = '%s_rainfall_intesity' % (boundary.name.lower().replace(' ', '_'))
+      wq_tests_data[var_name] = wq_defines.NO_DATA
+
+    salinity_var_name = 'c10_avg_salinity_%d' % (24)
+    wq_tests_data[salinity_var_name] = wq_defines.NO_DATA
+    wq_tests_data['c10_salinity_rec_cnt'] = wq_defines.NO_DATA
+    wq_tests_data['c10_min_salinity'] = wq_defines.NO_DATA
+    wq_tests_data['c10_max_salinity'] = wq_defines.NO_DATA
+    water_temp_var_name = 'c10_avg_water_temp_%d' % (24)
+    wq_tests_data[water_temp_var_name] = wq_defines.NO_DATA
+    wq_tests_data['c10_water_temp_rec_cnt'] = wq_defines.NO_DATA
+    wq_tests_data['c10_min_water_temp'] = wq_defines.NO_DATA
+    wq_tests_data['c10_max_water_temp'] = wq_defines.NO_DATA
+
+    return
+  def get_tide_data(self, start_date, wq_tests_data):
+    if self.logger:
+      self.logger.debug("Retrieving tide data for station: %s date: %s" % (self.tide_station, start_date))
+
+    tide = noaaTideData(logger=self.logger)
+    #Date/Time format for the NOAA is YYYYMMDD
 
 
     tide_data = tide.calcTideRange(beginDate = start_date.strftime('%Y%m%d'),
@@ -132,8 +169,6 @@ class florida_wq_data(wq_data):
 
   def get_nws_data(self, start_date, wq_tests_data):
 
-    wq_tests_data['nws_ksrq_avg_wspd'] = wq_defines.NO_DATA
-    wq_tests_data['nws_ksrq_avg_wdir'] = wq_defines.NO_DATA
     platform_handle = 'nws.ksrq.met'
 
     end_date_str = start_date.strftime('%Y-%m-%dT%H:%M:%S')
@@ -154,8 +189,6 @@ class florida_wq_data(wq_data):
       platform_handle = 'nws.%s.radarcoverage' % (boundary.name)
       # Get the radar data for previous 8 days in 24 hour intervals
       for prev_hours in range(24, 192, 24):
-        var_name = '%s_summary_%d' % (boundary.name.lower().replace(' ', '_'), prev_hours)
-        wq_tests_data[var_name] = wq_defines.NO_DATA
         radar_val = self.xenia_db.getLastNHoursSummaryFromRadarPrecip(platform_handle,
                                                                     start_date,
                                                                     prev_hours,
@@ -166,8 +199,6 @@ class florida_wq_data(wq_data):
         else:
           if self.logger:
             self.logger.error("No data available for boundary: %s Date: %s. Error: %s" %(var_name, start_date, self.xenia_db.getErrorInfo()))
-      var_name = '%s_dry_days_count' % (boundary.name.lower().replace(' ', '_'))
-      wq_tests_data[var_name] = wq_defines.NO_DATA
       prev_dry_days = self.xenia_db.getPrecedingRadarDryDaysCount(platform_handle,
                                              start_date,
                                              'precipitation_radar_weighted_average',
@@ -175,8 +206,6 @@ class florida_wq_data(wq_data):
       if prev_dry_days is not None:
         wq_tests_data[var_name] = prev_dry_days
 
-      var_name = '%s_rainfall_intesity' % (boundary.name.lower().replace(' ', '_'))
-      wq_tests_data[var_name] = wq_defines.NO_DATA
       rainfall_intensity = self.xenia_db.calcRadarRainfallIntensity(platform_handle,
                                                                start_date,
                                                                60,
@@ -192,16 +221,6 @@ class florida_wq_data(wq_data):
     if self.logger:
       self.logger.debug("Thredds C10 search for datetime: %s" % (start_date.strftime('%Y-%m-%d %H:%M:%S')))
 
-    salinity_var_name = 'c10_avg_salinity_%d' % (24)
-    wq_tests_data[salinity_var_name] = wq_defines.NO_DATA
-    wq_tests_data['c10_salinity_rec_cnt'] = wq_defines.NO_DATA
-    wq_tests_data['c10_min_salinity'] = wq_defines.NO_DATA
-    wq_tests_data['c10_max_salinity'] = wq_defines.NO_DATA
-    water_temp_var_name = 'c10_avg_water_temp_%d' % (24)
-    wq_tests_data[water_temp_var_name] = wq_defines.NO_DATA
-    wq_tests_data['c10_water_temp_rec_cnt'] = wq_defines.NO_DATA
-    wq_tests_data['c10_min_water_temp'] = wq_defines.NO_DATA
-    wq_tests_data['c10_max_water_temp'] = wq_defines.NO_DATA
 
     closest_start_time_idx = bisect_left(self.c10_times, start_epoch_time)
     c10_val = int(self.c10_times[closest_start_time_idx-1] + 0.5)
