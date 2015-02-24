@@ -78,9 +78,9 @@ class florida_wq_data(wq_data):
     #dt_time = [datetime.fromtimestamp(t) for t in c10_time]
     #strip timezone info out.
     #start_date_no_tz = start_date.replace(tzinfo=None)
-    #self.get_nws_data(start_date, wq_tests_data)
-    #self.get_thredds_data(start_date, wq_tests_data)
-    #self.get_nexrad_data(start_date, wq_tests_data)
+    self.get_nws_data(start_date, wq_tests_data)
+    self.get_thredds_data(start_date, wq_tests_data)
+    self.get_nexrad_data(start_date, wq_tests_data)
     self.get_tide_data(start_date, wq_tests_data)
   """
   Function: initialize_return_data
