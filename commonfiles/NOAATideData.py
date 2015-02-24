@@ -81,7 +81,7 @@ class noaaTideData(object):
     tideData['H'] = None
     try:
       wlData = self.getWaterLevelRawSixMinuteData(beginDate, endDate, station, datum, units, timezone)
-    except Webfault, e:
+    except WebFault, e:
       if self.logger:
         self.logger.exception(e)
     else:
