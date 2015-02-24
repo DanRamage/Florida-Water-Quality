@@ -6,11 +6,11 @@ import time
 from datetime import datetime
 from pytz import timezone as pytz_timezone
 from date_time_utils import get_utc_epoch, datetime2matlabdn
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
+#import matplotlib
+#matplotlib.use('Agg')
+#import matplotlib.pyplot as plt
 
-import numpy as np
+#import numpy as np
 
 class noaaTideData(object):
   LOW_TIDE = 0
