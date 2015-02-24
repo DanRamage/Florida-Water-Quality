@@ -34,6 +34,8 @@ class florida_wq_data(wq_data):
   def __init__(self, **kwargs):
     wq_data.__init__(self, **kwargs)
 
+    if self.logger:
+      self.logger.debug("Connection to thredds endpoint: %s" % (kwargs['c_10_tds_url']))
     #Connect to netcdf file for retrieving data from c10 buoy. To speed up retrieval, we connect
     #only once and retrieve the times.
     self.ncObj = nc.Dataset(kwargs['c_10_tds_url'])
@@ -41,10 +43,16 @@ class florida_wq_data(wq_data):
     self.c10_water_temp = self.ncObj.variables['temperature_04'][:]
     self.c10_salinity = self.ncObj.variables['salinity_04'][:]
 
+    if self.logger:
+      self.logger.debug("Connection to xenia db: %s" % (kwargs['xenia_database_name']))
     self.xenia_db = wqDB(kwargs['xenia_database_name'], type(self).__name__)
 
   def __del__(self):
+    if self.logger:
+      self.logger.debug("Closing connection to xenia db")
     self.xenia_db.DB.close()
+    if self.logger:
+      self.logger.debug("Closing connection to thredds endpoint.")
     self.ncObj.close()
 
   def initialize(self, **kwargs):
@@ -144,7 +152,7 @@ class florida_wq_data(wq_data):
                        units='feet',
                        timezone='GMT',
                        smoothData=False)
-    if tide_data and tide_data['HH']['value'] is not None and tide_data['LL']['value'] is not None:
+    if tide_data and 'HH' in tide_data and 'LL' in tide_data:
       range = tide_data['HH']['value'] - tide_data['LL']['value']
       #Save tide station values.
       tide_station = self.tide_station
