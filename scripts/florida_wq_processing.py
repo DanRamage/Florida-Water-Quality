@@ -2,22 +2,20 @@ import sys
 sys.path.append('../commonfiles')
 
 import logging.config
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta
 from pytz import timezone
 import optparse
 import ConfigParser
 import csv
 import netCDF4 as nc
-from suds import WebFault
-from suds.client import Client
 from math import isnan
-from bisect import bisect_left, bisect_right
+from bisect import bisect_left
 
 from collections import OrderedDict
 
 from wqHistoricalData import wq_data
 from wqXMRGProcessing import wqDB
-from wqHistoricalData import station_geometry, item_geometry, sampling_sites, wq_defines, geometry_list
+from wqHistoricalData import station_geometry,sampling_sites, wq_defines, geometry_list
 from date_time_utils import get_utc_epoch
 from NOAATideData import noaaTideData
 """
@@ -85,6 +83,8 @@ class florida_wq_data(wq_data):
     None
   """
   def initialize_return_data(self, wq_tests_data):
+    if self.logger:
+      self.logger.debug("Creating and initializing data dict.")
     #Build variables for the base tide station.
     var_name = '%s_tide_range' % (self.tide_station)
     wq_tests_data[var_name] = wq_defines.NO_DATA
@@ -124,6 +124,9 @@ class florida_wq_data(wq_data):
     wq_tests_data['c10_water_temp_rec_cnt'] = wq_defines.NO_DATA
     wq_tests_data['c10_min_water_temp'] = wq_defines.NO_DATA
     wq_tests_data['c10_max_water_temp'] = wq_defines.NO_DATA
+
+    if self.logger:
+      self.logger.debug("Finished creating and initializing data dict.")
 
     return
   def get_tide_data(self, start_date, wq_tests_data):
