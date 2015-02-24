@@ -153,27 +153,32 @@ class florida_wq_data(wq_data):
                        units='feet',
                        timezone='GMT',
                        smoothData=False)
-    if tide_data and 'HH' in tide_data and 'LL' in tide_data:
-      range = tide_data['HH']['value'] - tide_data['LL']['value']
-      #Save tide station values.
-      tide_station = self.tide_station
-      var_name = '%s_tide_range' % (tide_station)
-      wq_tests_data[var_name] = range
-      var_name = '%s_tide_hi' % (tide_station)
-      wq_tests_data[var_name] = tide_data['HH']['value']
-      var_name = '%s_tide_lo' % (tide_station)
-      wq_tests_data[var_name] = tide_data['LL']['value']
+    if tide_data and tide_data['HH'] is not None and tide_data['LL'] is not None:
+      try:
+        range = tide_data['HH']['value'] - tide_data['LL']['value']
+      except TypeError, e:
+        if self.logger:
+          self.logger.exception(e)
+      else:
+        #Save tide station values.
+        tide_station = self.tide_station
+        var_name = '%s_tide_range' % (tide_station)
+        wq_tests_data[var_name] = range
+        var_name = '%s_tide_hi' % (tide_station)
+        wq_tests_data[var_name] = tide_data['HH']['value']
+        var_name = '%s_tide_lo' % (tide_station)
+        wq_tests_data[var_name] = tide_data['LL']['value']
 
-      #Save subordinate station values
-      offset_hi = tide_data['HH']['value'] * self.tide_offset_settings['hi_tide_height_offset']
-      offset_lo = tide_data['LL']['value'] * self.tide_offset_settings['lo_tide_height_offset']
-      tide_station = self.tide_offset_settings['tide_station']
-      var_name = '%s_tide_range' % (tide_station)
-      wq_tests_data[var_name] = offset_hi - offset_lo
-      var_name = '%s_tide_hi' % (tide_station)
-      wq_tests_data[var_name] = offset_hi
-      var_name = '%s_tide_lo' % (tide_station)
-      wq_tests_data[var_name] = offset_lo
+        #Save subordinate station values
+        offset_hi = tide_data['HH']['value'] * self.tide_offset_settings['hi_tide_height_offset']
+        offset_lo = tide_data['LL']['value'] * self.tide_offset_settings['lo_tide_height_offset']
+        tide_station = self.tide_offset_settings['tide_station']
+        var_name = '%s_tide_range' % (tide_station)
+        wq_tests_data[var_name] = offset_hi - offset_lo
+        var_name = '%s_tide_hi' % (tide_station)
+        wq_tests_data[var_name] = offset_hi
+        var_name = '%s_tide_lo' % (tide_station)
+        wq_tests_data[var_name] = offset_lo
     else:
       if self.logger:
         self.logger.error("Tide data for station: %s date: %s not available or only partial." % (self.tide_station, start_date))
