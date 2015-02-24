@@ -185,8 +185,10 @@ class florida_wq_data(wq_data):
     return
 
   def get_nws_data(self, start_date, wq_tests_data):
-
     platform_handle = 'nws.ksrq.met'
+
+    if self.logger:
+      self.logger.debug("Start retrieving nws platform: %s data datetime: %s" % (platform_handle, start_date.strftime('%Y-%m-%d %H:%M:%S')))
 
     end_date_str = start_date.strftime('%Y-%m-%dT%H:%M:%S')
     stop_data = start_date - timedelta(hours=24)
@@ -198,12 +200,20 @@ class florida_wq_data(wq_data):
       wq_tests_data['nws_ksrq_avg_wspd'] = avgWindComponents[1][0]
       wq_tests_data['nws_ksrq_avg_wdir'] = avgWindComponents[1][1]
 
+    if self.logger:
+      self.logger.debug("Fisniehed retrieving nws platform: %s data" % (platform_handle))
+
     return
 
   def get_nexrad_data(self, start_date, wq_tests_data):
+    if self.logger:
+      self.logger.debug("Start retrieving nexrad data datetime: %s" % (start_date.strftime('%Y-%m-%d %H:%M:%S')))
+
     #Collect the radar data for the boundaries.
     for boundary in self.boundaries:
       platform_handle = 'nws.%s.radarcoverage' % (boundary.name)
+      if self.logger:
+        self.logger.debug("Start retrieving nexrad platfrom: %s" % (platform_handle))
       # Get the radar data for previous 8 days in 24 hour intervals
       for prev_hours in range(24, 192, 24):
         var_name = '%s_summary_%d' % (boundary.name.lower().replace(' ', '_'), prev_hours)
@@ -234,12 +244,19 @@ class florida_wq_data(wq_data):
         var_name = '%s_rainfall_intesity' % (boundary.name.lower().replace(' ', '_'))
         wq_tests_data[var_name] = rainfall_intensity
 
+      if self.logger:
+        self.logger.debug("Finished retrieving nexrad platfrom: %s" % (platform_handle))
+
+    if self.logger:
+      self.logger.debug("Finished retrieving nexrad data")
+
+
   def get_thredds_data(self, start_date, wq_tests_data):
     start_epoch_time = int(get_utc_epoch(start_date) + 0.5)
 
     #Find the starting time index to work from.
     if self.logger:
-      self.logger.debug("Thredds C10 search for datetime: %s" % (start_date.strftime('%Y-%m-%d %H:%M:%S')))
+      self.logger.debug("Start thredds C10 search for datetime: %s" % (start_date.strftime('%Y-%m-%d %H:%M:%S')))
 
 
     closest_start_time_idx = bisect_left(self.c10_times, start_epoch_time)
