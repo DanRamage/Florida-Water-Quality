@@ -2,6 +2,7 @@ import sys
 sys.path.append('../commonfiles')
 
 from suds.client import Client
+from suds import WebFault
 import time
 from datetime import datetime
 from pytz import timezone as pytz_timezone
@@ -80,7 +81,7 @@ class noaaTideData(object):
     tideData['H'] = None
     try:
       wlData = self.getWaterLevelRawSixMinuteData(beginDate, endDate, station, datum, units, timezone)
-    except suds.Webfault, e:
+    except Webfault, e:
       if self.logger:
         self.logger.exception(e)
     else:
