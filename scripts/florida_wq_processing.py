@@ -113,15 +113,16 @@ class florida_wq_data(wq_data):
     wq_tests_data['nws_ksrq_avg_wdir'] = wq_defines.NO_DATA
 
     for boundary in self.boundaries:
-      for prev_hours in range(24, 192, 24):
-        var_name = '%s_summary_%d' % (boundary.name.lower().replace(' ', '_'), prev_hours)
+      if len(boundary.name):
+        for prev_hours in range(24, 192, 24):
+          var_name = '%s_summary_%d' % (boundary.name.lower().replace(' ', '_'), prev_hours)
+          wq_tests_data[var_name] = wq_defines.NO_DATA
+
+        var_name = '%s_dry_days_count' % (boundary.name.lower().replace(' ', '_'))
         wq_tests_data[var_name] = wq_defines.NO_DATA
 
-      var_name = '%s_dry_days_count' % (boundary.name.lower().replace(' ', '_'))
-      wq_tests_data[var_name] = wq_defines.NO_DATA
-
-      var_name = '%s_rainfall_intesity' % (boundary.name.lower().replace(' ', '_'))
-      wq_tests_data[var_name] = wq_defines.NO_DATA
+        var_name = '%s_rainfall_intesity' % (boundary.name.lower().replace(' ', '_'))
+        wq_tests_data[var_name] = wq_defines.NO_DATA
 
     salinity_var_name = 'c10_avg_salinity_%d' % (24)
     wq_tests_data[salinity_var_name] = wq_defines.NO_DATA
