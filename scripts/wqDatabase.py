@@ -205,7 +205,7 @@ class wqDB(dhecDB):
     #Get the sensor ID for the obs we are interested in so we can use it to query the data.
     windSpdId = dhecDB.sensorExists(self, wind_speed_obsname, wind_speed_uom, platName)
     windDirId = dhecDB.sensorExists(self, wind_dir_obsname, wind_dir_uom, platName)
-    if windSpdId is not None and WindSpdId != -1 and\
+    if windSpdId is not None and windSpdId != -1 and\
       windDirId is not None and windDirId != -1:
       spd_sql = "SELECT m_date ,m_value FROM multi_obs\
              WHERE sensor_id = %d AND\
