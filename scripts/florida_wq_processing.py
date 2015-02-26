@@ -519,13 +519,17 @@ def create_historical_summary(config_file_name,
                 logger.debug("Start building historical wq data for: %s Date/Time UTC: %s/EST: %s" % (row['SPLocation'], wq_utc_date, wq_date))
               site_data = OrderedDict([('autonumber', row['autonumber']),
                                        ('station_name',row['SPLocation']),
-                                       ('sample_datetime', wq_utc_date),
+                                       ('sample_datetime', wq_date.strftime("%Y-%m-%d %H:%M:%S")),
+                                       ('sample_datetime_utc', wq_utc_date.strftime("%Y-%m-%d %H:%M:%S")),
                                        ('County', row['County']),
                                        ('enterococcus_value', row['enterococcus']),
                                        ('enterococcus_code', row['enterococcus_code'])])
-
-              fl_wq_data.query_data(site_data['sample_datetime'], site_data['sample_datetime'], site_data)
-
+              try:
+                fl_wq_data.query_data(site_data['sample_datetime'], site_data['sample_datetime'], site_data)
+              except Exception,e:
+                if self.logger:
+                  self.logger.exception(e)
+                sys.exit(-1)
               #wq_data_obj.append(site_data)
               header_buf = []
               data = []
