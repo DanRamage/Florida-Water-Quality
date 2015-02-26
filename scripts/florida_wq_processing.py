@@ -489,7 +489,7 @@ def create_historical_summary(config_file_name,
               except IOError, e:
                 if logger:
                   logger.exception(e)
-                pass
+                raise e
 
             date_val = row['Date']
             time_val = row['SampleTime']
