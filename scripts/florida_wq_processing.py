@@ -438,7 +438,7 @@ def create_historical_summary(config_file_name,
       sites_not_found = []
       wq_data_obj = []
       current_site = None
-
+      processed_sites = []
       #stop_date = eastern.localize(datetime.strptime('2014-01-29 00:00:00', '%Y-%m-%d %H:%M:%S'))
       #stop_date = stop_date.astimezone(timezone('UTC'))
 
@@ -459,7 +459,13 @@ def create_historical_summary(config_file_name,
                 site_data_file.close()
 
               current_site = cleaned_site_name
-
+              append_file = False
+              if current_site in processed_sites:
+                if logger:
+                  logger.debug("Site: %s has been found again, data is not ordered.")
+                append_file = True
+              else:
+                processed_sites.append(current_site)
               #We need to create a new data access object using the boundaries for the station.
               site = fl_sites.get_site(cleaned_site_name)
               #Get the station specific tide stations
@@ -482,10 +488,16 @@ def create_historical_summary(config_file_name,
               clean_filename = cleaned_site_name.replace(' ', '_')
               sample_site_filename = "%s/%s-Historical.csv" % (summary_out_file, clean_filename)
               write_header = True
-              if logger:
-                logger.debug("Opening sample site history file: %s" % (sample_site_filename))
               try:
-                site_data_file = open(sample_site_filename, 'w')
+                if not append_file:
+                  if logger:
+                    logger.debug("Opening sample site history file: %s" % (sample_site_filename))
+                  site_data_file = open(sample_site_filename, 'w')
+                else:
+                  if logger:
+                    logger.debug("Opening sample site history file with append: %s" % (sample_site_filename))
+                  site_data_file = open(sample_site_filename, 'w+')
+                  write_header = False
               except IOError, e:
                 if logger:
                   logger.exception(e)
@@ -527,8 +539,8 @@ def create_historical_summary(config_file_name,
               try:
                 fl_wq_data.query_data(site_data['sample_datetime'], site_data['sample_datetime'], site_data)
               except Exception,e:
-                if self.logger:
-                  self.logger.exception(e)
+                if logger:
+                  logger.exception(e)
                 sys.exit(-1)
               #wq_data_obj.append(site_data)
               header_buf = []
