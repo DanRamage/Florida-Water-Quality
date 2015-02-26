@@ -126,12 +126,12 @@ class florida_wq_data(wq_data):
 
     salinity_var_name = 'c10_avg_salinity_%d' % (24)
     wq_tests_data[salinity_var_name] = wq_defines.NO_DATA
-    wq_tests_data['c10_salinity_rec_cnt'] = wq_defines.NO_DATA
+    #wq_tests_data['c10_salinity_rec_cnt'] = wq_defines.NO_DATA
     wq_tests_data['c10_min_salinity'] = wq_defines.NO_DATA
     wq_tests_data['c10_max_salinity'] = wq_defines.NO_DATA
     water_temp_var_name = 'c10_avg_water_temp_%d' % (24)
     wq_tests_data[water_temp_var_name] = wq_defines.NO_DATA
-    wq_tests_data['c10_water_temp_rec_cnt'] = wq_defines.NO_DATA
+    #wq_tests_data['c10_water_temp_rec_cnt'] = wq_defines.NO_DATA
     wq_tests_data['c10_min_water_temp'] = wq_defines.NO_DATA
     wq_tests_data['c10_max_water_temp'] = wq_defines.NO_DATA
 
