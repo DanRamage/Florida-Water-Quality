@@ -496,7 +496,7 @@ def create_historical_summary(config_file_name,
                 else:
                   if logger:
                     logger.debug("Opening sample site history file with append: %s" % (sample_site_filename))
-                  site_data_file = open(sample_site_filename, 'w+')
+                  site_data_file = open(sample_site_filename, 'a')
                   write_header = False
               except IOError, e:
                 if logger:
