@@ -516,7 +516,7 @@ def create_historical_summary(config_file_name,
               #Convert to UTC
               wq_utc_date = wq_date.astimezone(timezone('UTC'))
               if logger:
-                logger.debug("Building historical wq data for: %s Date/Time UTC: %s/EST: %s" % (row['SPLocation'], wq_utc_date, wq_date))
+                logger.debug("Start building historical wq data for: %s Date/Time UTC: %s/EST: %s" % (row['SPLocation'], wq_utc_date, wq_date))
               site_data = OrderedDict([('autonumber', row['autonumber']),
                                        ('station_name',row['SPLocation']),
                                        ('sample_datetime', wq_utc_date),
@@ -545,6 +545,8 @@ def create_historical_summary(config_file_name,
               site_data_file.write(",".join(data))
               site_data_file.write('\n')
               data[:]
+              if logger:
+                logger.debug("Finished building historical wq data for: %s Date/Time UTC: %s/EST: %s" % (row['SPLocation'], wq_utc_date, wq_date))
 
 
 
