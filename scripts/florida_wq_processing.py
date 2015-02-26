@@ -202,7 +202,7 @@ class florida_wq_data(wq_data):
       wq_tests_data['nws_ksrq_avg_wdir'] = avgWindComponents[1][1]
 
     if self.logger:
-      self.logger.debug("Fisniehed retrieving nws platform: %s data" % (platform_handle))
+      self.logger.debug("Finished retrieving nws platform: %s data" % (platform_handle))
 
     return
 
@@ -249,7 +249,7 @@ class florida_wq_data(wq_data):
         self.logger.debug("Finished retrieving nexrad platfrom: %s" % (platform_handle))
 
     if self.logger:
-      self.logger.debug("Finished retrieving nexrad data")
+      self.logger.debug("Finished retrieving nexrad data datetime: %s" % (start_date.strftime('%Y-%m-%d %H:%M:%S')))
 
 
   def get_thredds_data(self, start_date, wq_tests_data):
@@ -310,14 +310,14 @@ class florida_wq_data(wq_data):
       if sal_rec_cnt > 0:
         avg_c10_salinity = avg_c10_salinity / sal_rec_cnt
         wq_tests_data['c10_avg_salinity_24'] = avg_c10_salinity
-        wq_tests_data['c10_salinity_rec_cnt'] = sal_rec_cnt
+        #wq_tests_data['c10_salinity_rec_cnt'] = sal_rec_cnt
         wq_tests_data['c10_min_salinity'] = min_sal
         wq_tests_data['c10_max_salinity'] = max_sal
 
       if temp_rec_cnt > 0:
         avg_c10_wt = avg_c10_wt / temp_rec_cnt
         wq_tests_data['c10_avg_water_temp_24'] = avg_c10_wt
-        wq_tests_data['c10_water_temp_rec_cnt'] = temp_rec_cnt
+        #wq_tests_data['c10_water_temp_rec_cnt'] = temp_rec_cnt
         wq_tests_data['c10_min_water_temp'] = min_temp
         wq_tests_data['c10_max_water_temp'] = max_temp
 
@@ -326,6 +326,9 @@ class florida_wq_data(wq_data):
                             % (start_date.strftime('%Y-%m-%d %H:%M:%S'), prev_hour_dt.strftime('%Y-%m-%d %H:%M:%S'),
                                str(avg_c10_salinity), str(min_sal), str(max_sal),
                                str(avg_c10_wt), str(min_temp), str(max_temp)))
+    if self.logger:
+      self.logger.debug("Finished thredds C10 search for datetime: %s" % (start_date.strftime('%Y-%m-%d %H:%M:%S')))
+
     return
 
 """
@@ -426,8 +429,8 @@ def create_historical_summary(config_file_name,
       wq_data_obj = []
       current_site = None
 
-      stop_date = eastern.localize(datetime.strptime('2014-01-29 00:00:00', '%Y-%m-%d %H:%M:%S'))
-      stop_date = stop_date.astimezone(timezone('UTC'))
+      #stop_date = eastern.localize(datetime.strptime('2014-01-29 00:00:00', '%Y-%m-%d %H:%M:%S'))
+      #stop_date = stop_date.astimezone(timezone('UTC'))
 
       fl_wq_data = florida_wq_data(xenia_database_name=xenia_db_file,
                                    c_10_tds_url=c_10_tds_url,
@@ -519,7 +522,10 @@ def create_historical_summary(config_file_name,
               for key in site_data:
                 if write_header:
                   header_buf.append(key)
-                data.append(str(site_data[key]))
+                if site_data[key] != wq_defines.NO_DATA:
+                  data.append(str(site_data[key]))
+                else:
+                  data.append("")
               if write_header:
                 site_data_file.write(",".join(header_buf))
                 site_data_file.write('\n')
