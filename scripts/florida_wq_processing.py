@@ -537,7 +537,7 @@ def create_historical_summary(config_file_name,
                                        ('enterococcus_value', row['enterococcus']),
                                        ('enterococcus_code', row['enterococcus_code'])])
               try:
-                fl_wq_data.query_data(site_data['sample_datetime'], site_data['sample_datetime'], site_data)
+                fl_wq_data.query_data(wq_utc_date, wq_utc_date, site_data)
               except Exception,e:
                 if logger:
                   logger.exception(e)
