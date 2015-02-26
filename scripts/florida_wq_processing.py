@@ -544,6 +544,7 @@ def create_historical_summary(config_file_name,
 
               site_data_file.write(",".join(data))
               site_data_file.write('\n')
+              site_data_file.flush()
               data[:]
               if logger:
                 logger.debug("Finished building historical wq data for: %s Date/Time UTC: %s/EST: %s" % (row['SPLocation'], wq_utc_date, wq_date))
