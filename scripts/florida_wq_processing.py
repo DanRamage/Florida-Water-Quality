@@ -74,6 +74,8 @@ class florida_wq_data(wq_data):
     None
   """
   def query_data(self, start_date, end_date, wq_tests_data):
+    if self.logger:
+      self.logger.debug("Start query data for datetime: %s" % (start_date))
     self.initialize_return_data(wq_tests_data)
     #dt_time = [datetime.fromtimestamp(t) for t in c10_time]
     #strip timezone info out.
@@ -82,6 +84,10 @@ class florida_wq_data(wq_data):
     self.get_thredds_data(start_date, wq_tests_data)
     self.get_nexrad_data(start_date, wq_tests_data)
     self.get_tide_data(start_date, wq_tests_data)
+
+    if self.logger:
+      self.logger.debug("Finished query data for datetime: %s" % (start_date))
+
   """
   Function: initialize_return_data
   Purpose: INitialize our ordered dict with the data variables and assign a NO_DATA
@@ -141,7 +147,7 @@ class florida_wq_data(wq_data):
     return
   def get_tide_data(self, start_date, wq_tests_data):
     if self.logger:
-      self.logger.debug("Retrieving tide data for station: %s date: %s" % (self.tide_station, start_date))
+      self.logger.debug("Start retrieving tide data for station: %s date: %s" % (self.tide_station, start_date))
 
     tide = noaaTideData(logger=self.logger)
     #Date/Time format for the NOAA is YYYYMMDD
@@ -183,6 +189,10 @@ class florida_wq_data(wq_data):
     else:
       if self.logger:
         self.logger.error("Tide data for station: %s date: %s not available or only partial." % (self.tide_station, start_date))
+
+    if self.logger:
+      self.logger.debug("Finished retrieving tide data for station: %s date: %s" % (self.tide_station, start_date))
+
     return
 
   def get_nws_data(self, start_date, wq_tests_data):
@@ -202,7 +212,7 @@ class florida_wq_data(wq_data):
       wq_tests_data['nws_ksrq_avg_wdir'] = avgWindComponents[1][1]
 
     if self.logger:
-      self.logger.debug("Finished retrieving nws platform: %s data" % (platform_handle))
+      self.logger.debug("Finished retrieving nws platform: %s data datetime: %s" % (platform_handle, start_date.strftime('%Y-%m-%d %H:%M:%S')))
 
     return
 
