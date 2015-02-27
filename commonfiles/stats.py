@@ -141,19 +141,18 @@ class correlation(covariance):
         
 class vectorMagDir(object):
   
-  def calcMagAndDir(self, x, y):
-    magnitude = math.hypot(x,y)   
+  def calcMagAndDir(self, x, y, positiveDegrees=True):
+    magnitude = math.hypot(x,y)
     angle = math.atan2(y,x)
+    #return(magnitude,angle)
+    if(positiveDegrees):
+      angle = 180/math.pi * angle;
+      angle = 90 - angle;
+      #only return positive degrees
+      if (angle < 0):
+        angle = 360 + angle;
     return(magnitude,angle)
-    #$angle = sprintf("%.1f",180/3.1416*$angle);
-    #$angle = 90 - $angle;
-    #only return positive degrees
-    #if ($angle < 0) 
-    #{ 
-    #  $angle = 360 + $angle; 
-    #}
-   # 
-    #my @result = ($mag, $angle);
+
   def calcVector(self, speed, direction):
     eastComp = speed * math.sin( math.radians(direction) );
     northComp = speed * math.cos( math.radians(direction) );  

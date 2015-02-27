@@ -81,9 +81,9 @@ class florida_wq_data(wq_data):
     #strip timezone info out.
     #start_date_no_tz = start_date.replace(tzinfo=None)
     self.get_nws_data(start_date, wq_tests_data)
-    self.get_thredds_data(start_date, wq_tests_data)
-    self.get_nexrad_data(start_date, wq_tests_data)
-    self.get_tide_data(start_date, wq_tests_data)
+    #self.get_thredds_data(start_date, wq_tests_data)
+    #self.get_nexrad_data(start_date, wq_tests_data)
+    #self.get_tide_data(start_date, wq_tests_data)
 
     if self.logger:
       self.logger.debug("Finished query data for datetime: %s" % (start_date))
