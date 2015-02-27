@@ -77,13 +77,10 @@ class florida_wq_data(wq_data):
     if self.logger:
       self.logger.debug("Start query data for datetime: %s" % (start_date))
     self.initialize_return_data(wq_tests_data)
-    #dt_time = [datetime.fromtimestamp(t) for t in c10_time]
-    #strip timezone info out.
-    #start_date_no_tz = start_date.replace(tzinfo=None)
     self.get_nws_data(start_date, wq_tests_data)
-    #self.get_thredds_data(start_date, wq_tests_data)
-    #self.get_nexrad_data(start_date, wq_tests_data)
-    #self.get_tide_data(start_date, wq_tests_data)
+    self.get_thredds_data(start_date, wq_tests_data)
+    self.get_nexrad_data(start_date, wq_tests_data)
+    self.get_tide_data(start_date, wq_tests_data)
 
     if self.logger:
       self.logger.debug("Finished query data for datetime: %s" % (start_date))
@@ -454,8 +451,6 @@ def create_historical_summary(config_file_name,
           cleaned_site_name = row['SPLocation'].replace("  ", " ")
 
           if fl_sites.get_site(cleaned_site_name):
-            if logger:
-              logger.debug("Line num: %d" % (line_num))
             new_outfile = False
             if current_site != cleaned_site_name:
               #Initialize site name
