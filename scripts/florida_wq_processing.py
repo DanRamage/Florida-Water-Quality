@@ -388,8 +388,10 @@ class florida_sample_sites(sampling_sites):
               station = station_geometry(row['SPLocation'], None)
               self.append(station)
 
-              boundaries = row['Boundary'].split(',')
+              boundaries =  row['Boundary'].split(',')
               for boundary in boundaries:
+                if self.logger:
+                  self.logger.debug("Sample site: %s Boundary: %s" % (row['SPLocation'], boundary))
                 boundary_geometry = fl_boundaries.get_geometry_item(boundary)
                 if add_site:
                   #Add the containing boundary
