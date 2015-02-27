@@ -454,7 +454,8 @@ def create_historical_summary(config_file_name,
           cleaned_site_name = row['SPLocation'].replace("  ", " ")
 
           if fl_sites.get_site(cleaned_site_name):
-            print("Line num: %d" % (line_num))
+            if logger:
+              logger.debug("Line num: %d" % (line_num))
             new_outfile = False
             if current_site != cleaned_site_name:
               #Initialize site name
