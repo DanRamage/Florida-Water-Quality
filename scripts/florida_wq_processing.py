@@ -567,6 +567,8 @@ def create_historical_summary(config_file_name,
         if logger:
           logger.exception(e)
       else:
+        if logger:
+          logger.info("Begin looping through file: %s" % (historical_wq_file))
         for row in wq_history_file:
           #Check to see if the site is one we are using
           if line_num > 0:
