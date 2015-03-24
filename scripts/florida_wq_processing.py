@@ -576,8 +576,6 @@ def create_historical_summary(config_file_name,
 
             date_val = row['Date']
             time_val = row['SampleTime']
-            if logger:
-              logger.info("Date: %s Time: %s" % (date_val,time_val))
             if len(date_val):
               #Date does not have leading 0s sometimes, so we add them.
               date_parts = date_val.split('/')
@@ -602,7 +600,7 @@ def create_historical_summary(config_file_name,
               #Convert to UTC
               wq_utc_date = wq_date.astimezone(timezone('UTC'))
 
-            if starting_date is not None and wq_utc_date >= starting_date:
+            if (starting_date is not None and wq_utc_date >= starting_date) or (starting_date is None):
               if fl_sites.get_site(cleaned_site_name):
                 new_outfile = False
                 if current_site != cleaned_site_name:
