@@ -556,172 +556,175 @@ def create_historical_summary(config_file_name,
       processed_sites = []
       #stop_date = eastern.localize(datetime.strptime('2014-01-29 00:00:00', '%Y-%m-%d %H:%M:%S'))
       #stop_date = stop_date.astimezone(timezone('UTC'))
+      try:
+        fl_wq_data = florida_wq_data(xenia_database_name=xenia_db_file,
+                                      c_10_tds_url=c_10_tds_url,
+                                      salinity_model_tds_url=salinity_model_tds_url,
+                                      salinity_model_bbox=salinity_model_bbox,
+                                      salinity_model_within_polygon=salinity_model_within_polygon,
+                                      use_logger=True)
+      except Exception, e:
+        if logger:
+          logger.exception(e)
+      else:
+        for row in wq_history_file:
+          #Check to see if the site is one we are using
+          if line_num > 0:
+            cleaned_site_name = row['SPLocation'].replace("  ", " ")
 
-      fl_wq_data = florida_wq_data(xenia_database_name=xenia_db_file,
-                                    c_10_tds_url=c_10_tds_url,
-                                    salinity_model_tds_url=salinity_model_tds_url,
-                                    salinity_model_bbox=salinity_model_bbox,
-                                    salinity_model_within_polygon=salinity_model_within_polygon,
-                                    use_logger=True)
-
-      for row in wq_history_file:
-        #Check to see if the site is one we are using
-        if line_num > 0:
-          cleaned_site_name = row['SPLocation'].replace("  ", " ")
-
-          date_val = row['Date']
-          time_val = row['SampleTime']
-          if len(date_val):
-            #Date does not have leading 0s sometimes, so we add them.
-            date_parts = date_val.split('/')
-            date_val = "%02d/%02d/%02d" % (int(date_parts[0]), int(date_parts[1]), int(date_parts[2]))
-            #If we want to use midnight as the starting time, or we did not have a sample time.
-            if start_time_midnight or len(time_val) == 0:
-              time_val = '00:00:00'
-            #Time doesn't have leading 0's so add them
-            else:
-              hours_mins = time_val.split(':')
-              time_val = "%02d:%02d:00" % (int(hours_mins[0]), int(hours_mins[1]))
-            try:
-              wq_date = eastern.localize(datetime.strptime('%s %s' % (date_val, time_val), '%m/%d/%y %H:%M:%S'))
-            except ValueError, e:
+            date_val = row['Date']
+            time_val = row['SampleTime']
+            if len(date_val):
+              #Date does not have leading 0s sometimes, so we add them.
+              date_parts = date_val.split('/')
+              date_val = "%02d/%02d/%02d" % (int(date_parts[0]), int(date_parts[1]), int(date_parts[2]))
+              #If we want to use midnight as the starting time, or we did not have a sample time.
+              if start_time_midnight or len(time_val) == 0:
+                time_val = '00:00:00'
+              #Time doesn't have leading 0's so add them
+              else:
+                hours_mins = time_val.split(':')
+                time_val = "%02d:%02d:00" % (int(hours_mins[0]), int(hours_mins[1]))
               try:
-                wq_date = eastern.localize(datetime.strptime('%s %s' % (date_val, time_val), '%m/%d/%Y %H:%M:%S'))
+                wq_date = eastern.localize(datetime.strptime('%s %s' % (date_val, time_val), '%m/%d/%y %H:%M:%S'))
               except ValueError, e:
-                if logger:
-                  logger.error("Processing halted at line: %d" % (line_num))
-                  logger.exception(e)
-                sys.exit(-1)
-            #Convert to UTC
-            wq_utc_date = wq_date.astimezone(timezone('UTC'))
-
-          if starting_date is not None and wq_utc_date >= starting_date:
-            if fl_sites.get_site(cleaned_site_name):
-              new_outfile = False
-              if current_site != cleaned_site_name:
-                #Initialize site name
-                if current_site != None:
-                  site_data_file.close()
-
-                current_site = cleaned_site_name
-                append_file = False
-                if current_site in processed_sites:
-                  if logger:
-                    logger.debug("Site: %s has been found again, data is not ordered.")
-                  append_file = True
-                else:
-                  processed_sites.append(current_site)
-                #We need to create a new data access object using the boundaries for the station.
-                site = fl_sites.get_site(cleaned_site_name)
                 try:
-                  #Get the station specific tide stations
-                  tide_station = config_file.get(cleaned_site_name, 'tide_station')
-                  offset_tide_station = config_file.get(cleaned_site_name, 'offset_tide_station')
-                  tide_offset_settings = {
-                    'tide_station': config_file.get(offset_tide_station, 'station_id'),
-                    'hi_tide_time_offset': config_file.getint(offset_tide_station, 'hi_tide_time_offset'),
-                    'lo_tide_time_offset': config_file.getint(offset_tide_station, 'lo_tide_time_offset'),
-                    'hi_tide_height_offset': config_file.getfloat(offset_tide_station, 'hi_tide_height_offset'),
-                    'lo_tide_height_offset': config_file.getfloat(offset_tide_station, 'lo_tide_height_offset')
-                  }
-
-                except ConfigParser.Error, e:
-                  if logger:
-                    logger.exception(e)
-
-                fl_wq_data.reset(site=site,
-                                  tide_station=tide_station,
-                                  tide_offset_params=tide_offset_settings)
-
-                clean_filename = cleaned_site_name.replace(' ', '_')
-                sample_site_filename = "%s/%s-Historical.csv" % (summary_out_file, clean_filename)
-                write_header = True
-                try:
-                  if not append_file:
-                    if logger:
-                      logger.debug("Opening sample site history file: %s" % (sample_site_filename))
-                    site_data_file = open(sample_site_filename, 'w')
-                  else:
-                    if logger:
-                      logger.debug("Opening sample site history file with append: %s" % (sample_site_filename))
-                    site_data_file = open(sample_site_filename, 'a')
-                    write_header = False
-                except IOError, e:
-                  if logger:
-                    logger.exception(e)
-                  raise e
-
-              date_val = row['Date']
-              time_val = row['SampleTime']
-              if len(date_val):
-                #Date does not have leading 0s sometimes, so we add them.
-                date_parts = date_val.split('/')
-                date_val = "%02d/%02d/%02d" % (int(date_parts[0]), int(date_parts[1]), int(date_parts[2]))
-                if len(time_val) == 0:
-                  time_val = '00:00:00'
-                #Time doesn't have leading 0's so add them
-                else:
-                  hours_mins = time_val.split(':')
-                  time_val = "%02d:%02d:00" % (int(hours_mins[0]), int(hours_mins[1]))
-                try:
-                  wq_date = eastern.localize(datetime.strptime('%s %s' % (date_val, time_val), '%m/%d/%y %H:%M:%S'))
+                  wq_date = eastern.localize(datetime.strptime('%s %s' % (date_val, time_val), '%m/%d/%Y %H:%M:%S'))
                 except ValueError, e:
-                  try:
-                    wq_date = eastern.localize(datetime.strptime('%s %s' % (date_val, time_val), '%m/%d/%Y %H:%M:%S'))
-                  except ValueError, e:
-                    if logger:
-                      logger.error("Processing halted at line: %d" % (line_num))
-                      logger.exception(e)
-                    sys.exit(-1)
-                #Convert to UTC
-                wq_utc_date = wq_date.astimezone(timezone('UTC'))
-                if logger:
-                  logger.debug("Start building historical wq data for: %s Date/Time UTC: %s/EST: %s" % (row['SPLocation'], wq_utc_date, wq_date))
-                site_data = OrderedDict([('autonumber', row['autonumber']),
-                                         ('station_name',row['SPLocation']),
-                                         ('sample_datetime', wq_date.strftime("%Y-%m-%d %H:%M:%S")),
-                                         ('sample_datetime_utc', wq_utc_date.strftime("%Y-%m-%d %H:%M:%S")),
-                                         ('County', row['County']),
-                                         ('enterococcus_value', row['enterococcus']),
-                                         ('enterococcus_code', row['enterococcus_code'])])
-                try:
-                  fl_wq_data.query_data(wq_utc_date, wq_utc_date, site_data)
-                except Exception,e:
                   if logger:
+                    logger.error("Processing halted at line: %d" % (line_num))
                     logger.exception(e)
                   sys.exit(-1)
-                #wq_data_obj.append(site_data)
-                header_buf = []
-                data = []
-                for key in site_data:
-                  if write_header:
-                    header_buf.append(key)
-                  if site_data[key] != wq_defines.NO_DATA:
-                    data.append(str(site_data[key]))
+              #Convert to UTC
+              wq_utc_date = wq_date.astimezone(timezone('UTC'))
+
+            if starting_date is not None and wq_utc_date >= starting_date:
+              if fl_sites.get_site(cleaned_site_name):
+                new_outfile = False
+                if current_site != cleaned_site_name:
+                  #Initialize site name
+                  if current_site != None:
+                    site_data_file.close()
+
+                  current_site = cleaned_site_name
+                  append_file = False
+                  if current_site in processed_sites:
+                    if logger:
+                      logger.debug("Site: %s has been found again, data is not ordered.")
+                    append_file = True
                   else:
-                    data.append("")
-                if write_header:
-                  site_data_file.write(",".join(header_buf))
+                    processed_sites.append(current_site)
+                  #We need to create a new data access object using the boundaries for the station.
+                  site = fl_sites.get_site(cleaned_site_name)
+                  try:
+                    #Get the station specific tide stations
+                    tide_station = config_file.get(cleaned_site_name, 'tide_station')
+                    offset_tide_station = config_file.get(cleaned_site_name, 'offset_tide_station')
+                    tide_offset_settings = {
+                      'tide_station': config_file.get(offset_tide_station, 'station_id'),
+                      'hi_tide_time_offset': config_file.getint(offset_tide_station, 'hi_tide_time_offset'),
+                      'lo_tide_time_offset': config_file.getint(offset_tide_station, 'lo_tide_time_offset'),
+                      'hi_tide_height_offset': config_file.getfloat(offset_tide_station, 'hi_tide_height_offset'),
+                      'lo_tide_height_offset': config_file.getfloat(offset_tide_station, 'lo_tide_height_offset')
+                    }
+
+                  except ConfigParser.Error, e:
+                    if logger:
+                      logger.exception(e)
+
+                  fl_wq_data.reset(site=site,
+                                    tide_station=tide_station,
+                                    tide_offset_params=tide_offset_settings)
+
+                  clean_filename = cleaned_site_name.replace(' ', '_')
+                  sample_site_filename = "%s/%s-Historical.csv" % (summary_out_file, clean_filename)
+                  write_header = True
+                  try:
+                    if not append_file:
+                      if logger:
+                        logger.debug("Opening sample site history file: %s" % (sample_site_filename))
+                      site_data_file = open(sample_site_filename, 'w')
+                    else:
+                      if logger:
+                        logger.debug("Opening sample site history file with append: %s" % (sample_site_filename))
+                      site_data_file = open(sample_site_filename, 'a')
+                      write_header = False
+                  except IOError, e:
+                    if logger:
+                      logger.exception(e)
+                    raise e
+
+                date_val = row['Date']
+                time_val = row['SampleTime']
+                if len(date_val):
+                  #Date does not have leading 0s sometimes, so we add them.
+                  date_parts = date_val.split('/')
+                  date_val = "%02d/%02d/%02d" % (int(date_parts[0]), int(date_parts[1]), int(date_parts[2]))
+                  if len(time_val) == 0:
+                    time_val = '00:00:00'
+                  #Time doesn't have leading 0's so add them
+                  else:
+                    hours_mins = time_val.split(':')
+                    time_val = "%02d:%02d:00" % (int(hours_mins[0]), int(hours_mins[1]))
+                  try:
+                    wq_date = eastern.localize(datetime.strptime('%s %s' % (date_val, time_val), '%m/%d/%y %H:%M:%S'))
+                  except ValueError, e:
+                    try:
+                      wq_date = eastern.localize(datetime.strptime('%s %s' % (date_val, time_val), '%m/%d/%Y %H:%M:%S'))
+                    except ValueError, e:
+                      if logger:
+                        logger.error("Processing halted at line: %d" % (line_num))
+                        logger.exception(e)
+                      sys.exit(-1)
+                  #Convert to UTC
+                  wq_utc_date = wq_date.astimezone(timezone('UTC'))
+                  if logger:
+                    logger.debug("Start building historical wq data for: %s Date/Time UTC: %s/EST: %s" % (row['SPLocation'], wq_utc_date, wq_date))
+                  site_data = OrderedDict([('autonumber', row['autonumber']),
+                                           ('station_name',row['SPLocation']),
+                                           ('sample_datetime', wq_date.strftime("%Y-%m-%d %H:%M:%S")),
+                                           ('sample_datetime_utc', wq_utc_date.strftime("%Y-%m-%d %H:%M:%S")),
+                                           ('County', row['County']),
+                                           ('enterococcus_value', row['enterococcus']),
+                                           ('enterococcus_code', row['enterococcus_code'])])
+                  try:
+                    fl_wq_data.query_data(wq_utc_date, wq_utc_date, site_data)
+                  except Exception,e:
+                    if logger:
+                      logger.exception(e)
+                    sys.exit(-1)
+                  #wq_data_obj.append(site_data)
+                  header_buf = []
+                  data = []
+                  for key in site_data:
+                    if write_header:
+                      header_buf.append(key)
+                    if site_data[key] != wq_defines.NO_DATA:
+                      data.append(str(site_data[key]))
+                    else:
+                      data.append("")
+                  if write_header:
+                    site_data_file.write(",".join(header_buf))
+                    site_data_file.write('\n')
+                    header_buf[:]
+                    write_header = False
+
+                  site_data_file.write(",".join(data))
                   site_data_file.write('\n')
-                  header_buf[:]
-                  write_header = False
-
-                site_data_file.write(",".join(data))
-                site_data_file.write('\n')
-                site_data_file.flush()
-                data[:]
-                if logger:
-                  logger.debug("Finished building historical wq data for: %s Date/Time UTC: %s/EST: %s" % (row['SPLocation'], wq_utc_date, wq_date))
+                  site_data_file.flush()
+                  data[:]
+                  if logger:
+                    logger.debug("Finished building historical wq data for: %s Date/Time UTC: %s/EST: %s" % (row['SPLocation'], wq_utc_date, wq_date))
 
 
 
-            else:
-              try:
-                sites_not_found.index(row['SPLocation'])
-              except ValueError,e:
-                sites_not_found.append(row['SPLocation'])
+              else:
+                try:
+                  sites_not_found.index(row['SPLocation'])
+                except ValueError,e:
+                  sites_not_found.append(row['SPLocation'])
 
-        line_num += 1
+          line_num += 1
       wq_file.close()
       if logger:
         logger.debug("Stations not matching: %s" % (", ".join(sites_not_found)))
