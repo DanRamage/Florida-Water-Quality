@@ -255,8 +255,8 @@ class florida_wq_data(wq_data):
   def get_tide_data(self, start_date, wq_tests_data):
     if self.logger:
       self.logger.debug("Start retrieving tide data for station: %s date: %s" % (self.tide_station, start_date))
-
-    tide = noaaTideData(logger=self.logger)
+    url = "http://opendap.co-ops.nos.noaa.gov/axis/webservices/waterlevelverifiedsixmin/wsdl/WaterLevelVerifiedSixMin.wsdl""
+    tide = noaaTideData(baseUrl=url, logger=self.logger)
     #Date/Time format for the NOAA is YYYYMMDD
 
 
