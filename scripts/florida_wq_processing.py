@@ -570,14 +570,14 @@ def create_historical_summary(config_file_name,
         if logger:
           logger.info("Begin looping through file: %s" % (historical_wq_file))
         for row in wq_history_file:
-          if logger:
-            logger.info("Line: %d" % (line_num))
           #Check to see if the site is one we are using
           if line_num > 0:
             cleaned_site_name = row['SPLocation'].replace("  ", " ")
 
             date_val = row['Date']
             time_val = row['SampleTime']
+            if logger:
+              logger.info("Date: %s Time: %s" % (date_val,time_val))
             if len(date_val):
               #Date does not have leading 0s sometimes, so we add them.
               date_parts = date_val.split('/')
