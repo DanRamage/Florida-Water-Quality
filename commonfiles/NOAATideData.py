@@ -98,7 +98,7 @@ class noaaTideData(object):
     else:
       shift = 1
 
-    data = soapClient.service.getWaterLevelVerifiedSixMinResponse(station, beginDate, endDate, datum, unit, shift)
+    data = soapClient.service.getWaterLevelVerifiedSixMin(station, beginDate, endDate, datum, unit, shift)
 
     return(data)
 
