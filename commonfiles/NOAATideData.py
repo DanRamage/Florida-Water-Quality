@@ -17,10 +17,13 @@ class noaaTideData(object):
   LOW_TIDE = 0
   HI_TIDE = 1
   
-  def __init__(self, baseUrl='http://opendap.co-ops.nos.noaa.gov/axis/webservices/waterlevelrawsixmin/wsdl/WaterLevelRawSixMin.wsdl', logger=None):
+  def __init__(self, use_raw=True, logger=None):
     self.tideChangesRawData = []
     self.tideChangesSmoothData = []
-    self.baseUrl = baseUrl
+    self.use_raw = use_raw
+    self.baseUrl = 'http://opendap.co-ops.nos.noaa.gov/axis/webservices/waterlevelrawsixmin/wsdl/WaterLevelRawSixMin.wsdl'
+    if not self.use_raw:
+      self.baseUrl = "http://opendap.co-ops.nos.noaa.gov/axis/webservices/waterlevelverifiedsixmin/wsdl/WaterLevelVerifiedSixMin.wsdl"
     self.logger = logger     
 
   """
@@ -60,7 +63,45 @@ class noaaTideData(object):
     data = soapClient.service.getWaterLevelRawSixMin(station, beginDate, endDate, datum, unit, shift)
 
     return(data)
-                      
+
+  """
+  beginDate is the date we wish to start our data query at. Format is: YYYYMMDD
+  endDate is the date we wish to end our data query at. Format is: YYYYMMDD
+  waterLevelSensorDataType is the type of water level we want. Can be:
+    W1 = Six minute interval data
+    W2 = Hourly water level data
+    W3 = Daily high/low water level data
+    W4 = Monthly high/low water level data
+  relative
+  datum A tidal datum is a standard elevation used as a reference to measure water levels.
+    MLLW, or Mean Lower Low Water, is the default datum. Other datum options  are MHHW, MHW, MTW, MSL, MLW, and Station Datum.
+  unit is the units of measurement, options are feet or meters.
+  shift is the time zone the data should be in. Can be: Local, GMT, LST
+  station is the station name in the form of "ID Name, State" for example: 8661070 Springmaid Pier,SC&
+  type is Historic Tide Data, most likely this changes when looking for predicted ranges.
+  format can be View Data or View Plot
+  """
+  def getWaterLevelVerifiedSixMinuteData(self,
+                                    beginDate,
+                                    endDate,
+                                    station,
+                                    datum='MLLW',
+                                    unit='feet',
+                                    shift='GMT' ):
+    soapClient = Client(self.baseUrl)
+    if(unit == 'feet'):
+      unit = 1
+    else:
+      unit = 2
+    if(shift == 'GMT'):
+      shift = 0
+    else:
+      shift = 1
+
+    data = soapClient.service.getWaterLevelVerifiedSixMinResponse(station, beginDate, endDate, datum, unit, shift)
+
+    return(data)
+
   def calcTideRange(self,           
                     beginDate, 
                     endDate, 
@@ -80,7 +121,10 @@ class noaaTideData(object):
     tideData['L'] = None
     tideData['H'] = None
     try:
-      wlData = self.getWaterLevelRawSixMinuteData(beginDate, endDate, station, datum, units, timezone)
+      if self.use_raw:
+        wlData = self.getWaterLevelRawSixMinuteData(beginDate, endDate, station, datum, units, timezone)
+      else:
+        wlData = self.getWaterLevelVerifiedSixMinuteData(beginDate, endDate, station, datum, units, timezone)
     except WebFault, e:
       if self.logger:
         self.logger.exception(e)
