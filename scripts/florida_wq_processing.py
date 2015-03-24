@@ -198,7 +198,7 @@ class florida_wq_data(wq_data):
     beginning_time = timezone('UTC').localize(datetime.strptime('1900-12-31 00:00:00', '%Y-%m-%d %H:%M:%S'))
     begin_date = start_date - timedelta(hours=24)
     end_date = start_date
-    if begin_date >= beginning_time:
+    if begin_date >= (beginning_time + timedelta(days=self.salinity_model_time[0])):
       start_time_delta = begin_date - beginning_time
       end_time_delta = end_date - beginning_time
 
