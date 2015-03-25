@@ -9,7 +9,7 @@ import csv
 from datetime import datetime
 from pytz import timezone
 
-import scipy.io as sio
+#import scipy.io as sio
 from netCDF4 import Dataset
 from NOAATideData import noaaTideData
 
