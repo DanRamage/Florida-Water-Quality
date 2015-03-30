@@ -452,8 +452,8 @@ def import_tide_data(config_file, output_file):
 
     fl_sites = florida_sample_sites(True)
     fl_sites.load_sites(file_name=sites_location_file, boundary_file=boundaries_location_file)
-    with open(output_file, "w") as tide_data_file:
-      tide_data_file.write("Station,Date,Range,Hi,Lo\n")
+    with open(output_file, "w") as tide_csv_file:
+      tide_csv_file.write("Station,Date,Range,Hi,Lo\n")
 
       with open(wq_sample_data_file, "rU") as wq_file:
         #Dates in the spreadsheet are stored in EST. WE want to work internally in UTC.
@@ -528,7 +528,7 @@ def import_tide_data(config_file, output_file):
                       wq_range = tide_range
                       tide_hi = tide_data['HH']['value']
                       tide_lo = tide_data['LL']['value']
-                      tide_data_file.write("%s,%s,%f,%f,%f\n"\
+                      tide_csv_file.write("%s,%s,%f,%f,%f\n"\
                                            % (tide_station,wq_utc_date.strftime("%Y-%m-%dT%H:%M:%S"),tide_range,tide_hi,tide_lo))
                       break
                   else:
@@ -559,7 +559,7 @@ def main():
   parser.add_option("-t", "--ImportTideData", dest="ImportTideData",
                     action="store_true", default=False,
                     help="" )
-  parser.add_option("-f", "--TideDataFile", dest="tide_data_file",
+  parser.add_option("-f", "--TideDataFile", dest="tide_csv_file",
                     help="" )
 
 
@@ -585,8 +585,8 @@ def main():
     traceback.print_exc(e)
     sys.exit(-1)
   else:
-    if options.ImportTideData and len(options.tide_data_file):
-      import_tide_data(options.config_file, options.tide_data_file)
+    if options.ImportTideData and len(options.tide_csv_file):
+      import_tide_data(options.config_file, options.tide_csv_file)
 
     if options.nws_directory is not None and len(options.nws_directory):
       import_nws_data(options.nws_directory, xenia_db)
