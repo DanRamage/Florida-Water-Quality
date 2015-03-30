@@ -88,7 +88,7 @@ class noaaTideData(object):
                                     datum='MLLW',
                                     unit='feet',
                                     shift='GMT' ):
-    soapClient = Client(self.baseUrl)
+    soapClient = Client(self.baseUrl, timeout=90)
     if(unit == 'feet'):
       unit = 1
     else:

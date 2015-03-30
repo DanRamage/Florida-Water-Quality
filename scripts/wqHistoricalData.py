@@ -131,3 +131,46 @@ class sampling_sites(list):
       if site.name.lower() == site_name.lower():
         return site
     return None
+
+
+class tide_data_file(dict):
+  def __init__(self, logger=True):
+    self.logger = None
+    self.tide_file_name = None
+    if logger:
+      self.logger = logging.getLogger(type(self).__name__)
+
+  def open(self, tide_csv_file, header_str="Station,Date,Range,Hi,Lo"):
+    if self.logger:
+      self.logger.debug("Opening tide file: %s" % (tide_csv_file))
+
+    try:
+      self.tide_file_name = tide_csv_file
+      header_row = header_str.split(',')
+      with open(tide_csv_file, "r") as tide_file:
+        dict_file = csv.DictReader(tide_file, delimiter=',', quotechar='"', fieldnames=header_row)
+        line_num = 0
+        for row in dict_file:
+          if line_num > 0:
+            try:
+              self.__setitem__(row['Date'], {'station': row['Station'],
+                                              'range': float(row['Range']),
+                                              'hi': float(row['Hi']),
+                                              'lo': float(row['Lo'])})
+            except ValueError, e:
+              if self.logger:
+                self.logger("Error on line: %d" % (line_num))
+                self.logger.exception(e)
+          line_num += 1
+      if self.logger:
+        self.logger.debug("Processed %d lines." % (line_num))
+    except (IOError,Exception) as e:
+      if self.logger:
+        self.logger.exception(e)
+
+
+  def add_data(self, date, station, tide_range, tide_hi, tide_lo):
+    self.__setitem__(date), {'station': station,
+                              'range': tide_range,
+                              'hi': tide_hi,
+                              'lo': tide_lo}

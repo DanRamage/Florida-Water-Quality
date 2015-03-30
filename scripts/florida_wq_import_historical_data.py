@@ -490,30 +490,33 @@ def import_tide_data(config_file, output_file):
 
               if logger:
                 logger.debug("Start retrieving tide data for station: %s date: %s" % (tide_station, wq_utc_date.strftime("%Y-%m-%dT%H:%M:%S")))
-
-              tide_data = tide.calcTideRange(beginDate = wq_utc_date.strftime('%Y%m%d'),
-                                 endDate = wq_utc_date.strftime('%Y%m%d'),
-                                 station=tide_station,
-                                 datum='MLLW',
-                                 units='feet',
-                                 timezone='GMT',
-                                 smoothData=False)
-              if tide_data and tide_data['HH'] is not None and tide_data['LL'] is not None:
-                try:
-                  range = tide_data['HH']['value'] - tide_data['LL']['value']
-                except TypeError, e:
-                  if logger:
-                    logger.exception(e)
-                else:
-                  #Save tide station values.
-                  wq_range = range
-                  tide_hi = tide_data['HH']['value']
-                  tide_lo = tide_data['LL']['value']
-                  tide_data_file.write("%s,%s,%f,%f,%f\n"\
-                                       % (tide_station,wq_utc_date.strftime("%Y-%m-%dT%H:%M:%S"),range,tide_hi,tide_lo))
-              else:
+              for x in range(0,5):
                 if logger:
-                  logger.error("Tide data for station: %s date: %s not available or only partial." % (tide_station, wq_utc_date.strftime("%Y-%m-%dT%H:%M:%S")))
+                  logger.debug("Attempt: %d retrieving tide data for station." % (x+1))
+                tide_data = tide.calcTideRange(beginDate = wq_utc_date.strftime('%Y%m%d'),
+                                   endDate = wq_utc_date.strftime('%Y%m%d'),
+                                   station=tide_station,
+                                   datum='MLLW',
+                                   units='feet',
+                                   timezone='GMT',
+                                   smoothData=False)
+                if tide_data and tide_data['HH'] is not None and tide_data['LL'] is not None:
+                  try:
+                    range = tide_data['HH']['value'] - tide_data['LL']['value']
+                  except TypeError, e:
+                    if logger:
+                      logger.exception(e)
+                  else:
+                    #Save tide station values.
+                    wq_range = range
+                    tide_hi = tide_data['HH']['value']
+                    tide_lo = tide_data['LL']['value']
+                    tide_data_file.write("%s,%s,%f,%f,%f\n"\
+                                         % (tide_station,wq_utc_date.strftime("%Y-%m-%dT%H:%M:%S"),range,tide_hi,tide_lo))
+                    break
+                else:
+                  if logger:
+                    logger.error("Tide data for station: %s date: %s not available or only partial." % (tide_station, wq_utc_date.strftime("%Y-%m-%dT%H:%M:%S")))
 
               if logger:
                 logger.debug("Finished retrieving tide data for station: %s date: %s" % (tide_station, wq_utc_date.strftime("%Y-%m-%dT%H:%M:%S")))
