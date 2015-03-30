@@ -499,6 +499,13 @@ def import_tide_data(config_file, output_file):
                 if date_key in initial_tide_data:
                   if logger:
                     logger.debug("Station: %s date: %s in history file, not retrieving." % (tide_station, wq_utc_date.strftime("%Y-%m-%dT%H:%M:%S")))
+                  tide_csv_file.write("%s,%s,%f,%f,%f\n"\
+                                       % (tide_station,
+                                          wq_utc_date.strftime("%Y-%m-%dT%H:%M:%S"),
+                                          initial_tide_data[date_key]['range'],
+                                          initial_tide_data[date_key]['hi'],
+                                          initial_tide_data[date_key]['lo']))
+
                   tide_time = None
               else:
                 if logger:
@@ -525,15 +532,24 @@ def import_tide_data(config_file, output_file):
                         logger.exception(e)
                     else:
                       #Save tide station values.
-                      wq_range = tide_range
                       tide_hi = tide_data['HH']['value']
                       tide_lo = tide_data['LL']['value']
-                      tide_csv_file.write("%s,%s,%f,%f,%f\n"\
-                                           % (tide_station,wq_utc_date.strftime("%Y-%m-%dT%H:%M:%S"),tide_range,tide_hi,tide_lo))
                       break
                   else:
                     if logger:
-                      logger.error("Tide data for station: %s date: %s not available or only partial." % (tide_station, wq_utc_date.strftime("%Y-%m-%dT%H:%M:%S")))
+                      logger.error("Tide data for station: %s date: %s not available or only partial, using Peak data." % (tide_station, wq_utc_date.strftime("%Y-%m-%dT%H:%M:%S")))
+                    try:
+                      tide_hi = tide_data['PeakValue']['value']
+                      tide_lo = tide_data['ValleyValue']['value']
+                      tide_range = tide_hi - tide_lo
+                    except TypeError, e:
+                      if logger:
+                        logger.exception(e)
+
+                  if tide_range is not None:
+                    tide_csv_file.write("%s,%s,%f,%f,%f\n"\
+                         % (tide_station,wq_utc_date.strftime("%Y-%m-%dT%H:%M:%S"),tide_range,tide_hi,tide_lo))
+
 
               if logger:
                 logger.debug("Finished retrieving tide data for station: %s date: %s" % (tide_station, wq_utc_date.strftime("%Y-%m-%dT%H:%M:%S")))

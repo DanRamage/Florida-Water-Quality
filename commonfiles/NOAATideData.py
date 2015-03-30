@@ -120,6 +120,8 @@ class noaaTideData(object):
     tideData['HH'] = None
     tideData['L'] = None
     tideData['H'] = None
+    tideData['PeakValue'] = None
+    tideData['ValleyValue'] = None
     try:
       if self.use_raw:
         wlData = self.getWaterLevelRawSixMinuteData(beginDate, endDate, station, datum, units, timezone)
@@ -287,6 +289,13 @@ class noaaTideData(object):
               tide_change_ts = timeStamp
 
               changeNdx = ndx
+        #Save off the highest and lowest values.
+        if tideData['PeakValue'] is None or tideData['PeakValue']['value'] < a:
+          tideData['PeakValue'] = {'value': a,
+                                    'date': timeStamp}
+        if tideData['ValleyValue'] is None or tideData['ValleyValue']['value'] > a:
+          tideData['ValleyValue'] = {'value': a,
+                                    'date': timeStamp}
 
         ndx += 1
 
@@ -349,7 +358,7 @@ class noaaTideData(object):
           ndx += 1
           tideFile.write(outbuf)
         tideFile.close()
-    
+    #If we didn't have all the inflection points, we'll use the peak/valley values for the missing one(s).
     return(tideData)
 if __name__ == '__main__':
   tide = noaaTideData()
