@@ -490,7 +490,7 @@ def import_tide_data(config_file, output_file):
 
               if logger:
                 logger.debug("Start retrieving tide data for station: %s date: %s" % (tide_station, wq_utc_date.strftime("%Y-%m-%dT%H:%M:%S")))
-              for x in range(0,5):
+              for x in range(0, 5):
                 if logger:
                   logger.debug("Attempt: %d retrieving tide data for station." % (x+1))
                 tide_data = tide.calcTideRange(beginDate = wq_utc_date.strftime('%Y%m%d'),
