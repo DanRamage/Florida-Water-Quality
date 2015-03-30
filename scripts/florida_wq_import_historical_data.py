@@ -527,14 +527,12 @@ def import_tide_data(config_file, output_file):
                   if tide_data and tide_data['HH'] is not None and tide_data['LL'] is not None:
                     try:
                       tide_range = tide_data['HH']['value'] - tide_data['LL']['value']
-                    except TypeError, e:
-                      if logger:
-                        logger.exception(e)
-                    else:
                       #Save tide station values.
                       tide_hi = tide_data['HH']['value']
                       tide_lo = tide_data['LL']['value']
-                      break
+                    except TypeError, e:
+                      if logger:
+                        logger.exception(e)
                   else:
                     if logger:
                       logger.error("Tide data for station: %s date: %s not available or only partial, using Peak data." % (tide_station, wq_utc_date.strftime("%Y-%m-%dT%H:%M:%S")))
@@ -549,6 +547,7 @@ def import_tide_data(config_file, output_file):
                   if tide_range is not None:
                     tide_csv_file.write("%s,%s,%f,%f,%f\n"\
                          % (tide_station,wq_utc_date.strftime("%Y-%m-%dT%H:%M:%S"),tide_range,tide_hi,tide_lo))
+                    break
 
 
               if logger:
