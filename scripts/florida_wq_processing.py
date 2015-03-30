@@ -19,7 +19,7 @@ from shapely.geometry import Polygon
 
 from wqHistoricalData import wq_data
 from wqXMRGProcessing import wqDB
-from wqHistoricalData import station_geometry,sampling_sites, wq_defines, geometry_list
+from wqHistoricalData import station_geometry,sampling_sites, wq_defines, geometry_list, tide_data_file
 from date_time_utils import get_utc_epoch
 from NOAATideData import noaaTideData
 from romsTools import bbox2ij, closestCellFromPtInPolygon
@@ -45,6 +45,13 @@ class florida_wq_data(wq_data):
   def __init__(self, **kwargs):
     wq_data.__init__(self, **kwargs)
 
+    self.site = None
+    #The main station we retrieve the values from.
+    self.tide_station =  None
+    #These are the settings to correct the tide for the subordinate station.
+    self.tide_offset_settings =  None
+    self.tide_data_obj = None
+
     if self.logger:
       self.logger.debug("Connecting to thredds endpoint for c10: %s" % (kwargs['c_10_tds_url']))
     #Connect to netcdf file for retrieving data from c10 buoy. To speed up retrieval, we connect
@@ -54,30 +61,60 @@ class florida_wq_data(wq_data):
     self.c10_water_temp = self.ncObj.variables['temperature_04'][:]
     self.c10_salinity = self.ncObj.variables['salinity_04'][:]
 
-    if self.logger:
-      self.logger.debug("Connecting to thredds endpoint for salinity data: %s" % (kwargs['salinity_model_tds_url']))
-    self.salinity_model_bbox = kwargs['salinity_model_bbox']
-    self.salinity_model_within_polygon = Polygon(kwargs['salinity_model_within_polygon'])
+    self.model_bbox = kwargs['model_bbox']
+    self.model_within_polygon = Polygon(kwargs['model_within_polygon'])
 
-    self.salinity_model_url = kwargs['salinity_model_tds_url']
-    self.salinity_model = nc.Dataset(kwargs['salinity_model_tds_url'])
-    self.salinity_model_time = self.salinity_model.variables['MT'][:]
-    salinity_model_bbox = [float(self.salinity_model_bbox[0]),float(self.salinity_model_bbox[2]),
-                          float(self.salinity_model_bbox[1]),float(self.salinity_model_bbox[3])]
+    if self.logger:
+      self.logger.debug("Connecting to thredds endpoint for hycom data: %s" % (kwargs['hycom_model_tds_url']))
+    self.hycom_model = nc.Dataset(kwargs['hycom_model_tds_url'])
+
+    self.hycom_model_time = self.hycom_model.variables['MT'][:]
+    model_bbox = [float(self.model_bbox[0]),float(self.model_bbox[2]),
+                          float(self.model_bbox[1]),float(self.model_bbox[3])]
 
     #Determine the bounding box indexes.
-    lons = self.salinity_model.variables['Longitude'][:]
-    lats = self.salinity_model.variables['Latitude'][:]
+    lons = self.hycom_model.variables['Longitude'][:]
+    lats = self.hycom_model.variables['Latitude'][:]
     # latitude lower and upper index
-    self.hycom_latli = np.argmin( np.abs( lats - salinity_model_bbox[2] ) )
-    self.hycom_latui = np.argmin( np.abs( lats - salinity_model_bbox[3] ) )
+    self.hycom_latli = np.argmin( np.abs( lats - model_bbox[2] ) )
+    self.hycom_latui = np.argmin( np.abs( lats - model_bbox[3] ) )
     # longitude lower and upper index
-    self.hycom_lonli = np.argmin( np.abs( lons - salinity_model_bbox[0] ) )
-    self.hycom_lonui = np.argmin( np.abs( lons - salinity_model_bbox[1] ) )
+    self.hycom_lonli = np.argmin( np.abs( lons - model_bbox[0] ) )
+    self.hycom_lonui = np.argmin( np.abs( lons - model_bbox[1] ) )
 
-    self.hycom_lon_array = self.salinity_model.variables['Longitude'][self.hycom_lonli:self.hycom_lonui]
-    self.hycom_lat_array = self.salinity_model.variables['Latitude'][self.hycom_latli:self.hycom_latui]
+    self.hycom_lon_array = self.hycom_model.variables['Longitude'][self.hycom_lonli:self.hycom_lonui]
+    self.hycom_lat_array = self.hycom_model.variables['Latitude'][self.hycom_latli:self.hycom_latui]
 
+    """
+    if self.logger:
+      self.logger.debug("Connecting to thredds endpoint for ncsu data: %s" % (kwargs['ncsu_model_tds_url']))
+    self.ncsu_model = nc.Dataset(kwargs['ncsu_model_tds_url'])
+
+    self.ncsu_model_time = self.ncsu_model.variables['time3'][:]
+    model_bbox = [float(self.model_bbox[0]),float(self.model_bbox[2]),
+                          float(self.model_bbox[1]),float(self.model_bbox[3])]
+
+    #Determine the bounding box indexes.
+    lons = self.ncsu_model.variables['lon_rho'][:]
+    lats = self.ncsu_model.variables['lat_rho'][:]
+    # latitude lower and upper index
+    #self.ncsu_latli = np.argmin( np.abs( lats - model_bbox[2] ) )
+    #self.ncsu_latui = np.argmin( np.abs( lats - model_bbox[3] ) )
+    # longitude lower and upper index
+    #self.ncsu_lonli = np.argmin( np.abs( lons - model_bbox[0] ) )
+    #self.ncsu_lonui = np.argmin( np.abs( lons - model_bbox[1] ) )
+    self.ncsu_i0,self.ncsu_i1,self.ncsu_j0,self.ncsu_j1 = bbox2ij(lons,lats,model_bbox)
+
+    self.ncsu_lon_array = self.ncsu_model.variables['lon_rho'][self.ncsu_j0:self.ncsu_j1,self.ncsu_i0:self.ncsu_i1]
+    self.ncsu_lat_array = self.ncsu_model.variables['lat_rho'][self.ncsu_j0:self.ncsu_j1,self.ncsu_i0:self.ncsu_i1]
+    with open("/Users/danramage/tmp/salinity_model.csv", "w") as out_file:
+      out_file.write("Latitude,Longitude,Lat Ndx,Lon Ndx\n")
+      #flat_lon = self.ncsu_lon_array.flatten()
+      #flat_lat = self.ncsu_lat_array.flatten()
+      for lon_ndx in range(0,len(self.ncsu_lon_array[0])):
+        for lat_ndx in range(0,len(self.ncsu_lat_array[0])):
+          out_file.write("%f,%f,%d,%d\n" % (self.ncsu_lat_array[0][lat_ndx],self. ncsu_lon_array[0][lon_ndx], lat_ndx, lon_ndx))
+    """
     if self.logger:
       self.logger.debug("Connection to xenia db: %s" % (kwargs['xenia_database_name']))
     self.xenia_db = wqDB(kwargs['xenia_database_name'], type(self).__name__)
@@ -93,7 +130,7 @@ class florida_wq_data(wq_data):
 
     if self.logger:
       self.logger.debug("Closing connection to hycom endpoint.")
-    self.salinity_model.close()
+    self.hycom_model.close()
 
   def reset(self, **kwargs):
     self.site = kwargs['site']
@@ -101,6 +138,10 @@ class florida_wq_data(wq_data):
     self.tide_station = kwargs['tide_station']
     #These are the settings to correct the tide for the subordinate station.
     self.tide_offset_settings = kwargs['tide_offset_params']
+
+    self.tide_data_obj = None
+    if 'tide_data_obj' in kwargs and kwargs['tide_data_obj'] is not None:
+      self.tide_data_obj = kwargs['tide_data_obj']
 
   """
   Function: query_data
@@ -122,7 +163,7 @@ class florida_wq_data(wq_data):
     self.get_c10_data(start_date, wq_tests_data)
     self.get_nexrad_data(start_date, wq_tests_data)
     self.get_tide_data(start_date, wq_tests_data)
-    self.get_model_salinity(start_date, wq_tests_data)
+    self.get_hycom_model_data(start_date, wq_tests_data)
 
     if self.logger:
       self.logger.debug("Site: %s Finished query data for datetime: %s" % (self.site.name, start_date))
@@ -169,36 +210,43 @@ class florida_wq_data(wq_data):
         var_name = '%s_rainfall_intesity' % (boundary.name.lower().replace(' ', '_'))
         wq_tests_data[var_name] = wq_defines.NO_DATA
 
-    salinity_var_name = 'c10_avg_salinity_%d' % (24)
-    wq_tests_data[salinity_var_name] = wq_defines.NO_DATA
+    wq_tests_data['c10_avg_salinity_24'] = wq_defines.NO_DATA
     #wq_tests_data['c10_salinity_rec_cnt'] = wq_defines.NO_DATA
     wq_tests_data['c10_min_salinity'] = wq_defines.NO_DATA
     wq_tests_data['c10_max_salinity'] = wq_defines.NO_DATA
-    water_temp_var_name = 'c10_avg_water_temp_%d' % (24)
-    wq_tests_data[water_temp_var_name] = wq_defines.NO_DATA
+    wq_tests_data['c10_avg_water_temp_24'] = wq_defines.NO_DATA
     #wq_tests_data['c10_water_temp_rec_cnt'] = wq_defines.NO_DATA
     wq_tests_data['c10_min_water_temp'] = wq_defines.NO_DATA
     wq_tests_data['c10_max_water_temp'] = wq_defines.NO_DATA
 
-    salinity_var_name = 'hycom_avg_salinity_%d' % (24)
-    wq_tests_data[salinity_var_name] = wq_defines.NO_DATA
+    wq_tests_data['hycom_avg_salinity_24'] = wq_defines.NO_DATA
     wq_tests_data['hycom_min_salinity'] = wq_defines.NO_DATA
     wq_tests_data['hycom_max_salinity'] = wq_defines.NO_DATA
+    wq_tests_data['hycom_avg_water_temp_24'] = wq_defines.NO_DATA
+    wq_tests_data['hycom_min_water_temp'] = wq_defines.NO_DATA
+    wq_tests_data['hycom_max_water_temp'] = wq_defines.NO_DATA
 
+    wq_tests_data['ncsu_avg_salinity_24'] = wq_defines.NO_DATA
+    wq_tests_data['ncsu_min_salinity'] = wq_defines.NO_DATA
+    wq_tests_data['ncsu_max_salinity'] = wq_defines.NO_DATA
+    wq_tests_data['ncsu_avg_water_temp_24'] = wq_defines.NO_DATA
+    wq_tests_data['ncsu_min_water_temp'] = wq_defines.NO_DATA
+    wq_tests_data['ncsu_max_water_temp'] = wq_defines.NO_DATA
     if self.logger:
       self.logger.debug("Finished creating and initializing data dict.")
 
     return
 
-  def get_model_salinity(self, start_date, wq_tests_data):
+  def get_ncsu_model_data(self, start_date, wq_tests_data):
     if self.logger:
-      self.logger.debug("Start retrieving model salinity date: %s" % (start_date))
+      self.logger.debug("Start retrieving ncsu model data: %s" % (start_date))
 
 
     beginning_time = timezone('UTC').localize(datetime.strptime('1900-12-31 00:00:00', '%Y-%m-%d %H:%M:%S'))
     begin_date = start_date - timedelta(hours=24)
     end_date = start_date
-    if begin_date >= (beginning_time + timedelta(days=self.salinity_model_time[0])):
+    #Verify that the date we are interested should be in the ncsu model data.
+    if begin_date >= (beginning_time + timedelta(days=self.ncsu_model_time[0])):
       start_time_delta = begin_date - beginning_time
       end_time_delta = end_date - beginning_time
 
@@ -206,8 +254,8 @@ class florida_wq_data(wq_data):
       #offset_hours = (time_delta.days * 24) + (time_delta.seconds / (60 * 60 * 24))
       offset_start = (start_time_delta.days) + (start_time_delta.seconds / (60.0 * 60.0 * 24.0))
       offset_end = (end_time_delta.days) + (end_time_delta.seconds / (60.0 * 60.0 * 24.0))
-      closest_start_ndx = bisect_left(self.salinity_model_time, offset_start)
-      closest_end_ndx = bisect_left(self.salinity_model_time, offset_end)
+      closest_start_ndx = bisect_left(self.ncsu_model_time, offset_start)
+      closest_end_ndx = bisect_left(self.ncsu_model_time, offset_end)
       if closest_start_ndx != -1 and closest_end_ndx != -1:
         """
         with open("/Users/danramage/tmp/salinity_model.csv", "w") as out_file:
@@ -217,24 +265,34 @@ class florida_wq_data(wq_data):
               out_file.write("%f,%f,%d,%d\n" % (lat_array[lat_ndx], lon_array[lon_ndx], lat_ndx, lon_ndx))
         """
         try:
-          salinity_data = self.salinity_model.variables['salinity'][closest_start_ndx:closest_end_ndx,0,self.hycom_latli:self.hycom_latui,self.hycom_lonli:self.hycom_lonui]
+          salinity_data = self.ncsu_model.variables['salinity'][closest_start_ndx:closest_end_ndx,0,self.ncsu_latli:self.ncsu_latui,self.ncsu_lonli:self.ncsu_lonui]
           pt = closestCellFromPtInPolygon(self.site.object_geometry,
-                                          self.hycom_lon_array, self.hycom_lat_array,
+                                          self.ncsu_lon_array, self.ncsu_lat_array,
                                           salinity_data[0],
-                                          self.salinity_model.variables['salinity']._FillValue,
-                                          self.salinity_model_within_polygon)
-
+                                          self.ncsu_model.variables['salinity']._FillValue,
+                                          self.ncsu_model_within_polygon)
+          #Get the salinity data
           avg_salinity_pts = salinity_data[0:closest_end_ndx-closest_start_ndx,pt.y,pt.x]
-          salinity_var_name = 'hycom_avg_salinity_%d' % (24)
-          wq_tests_data[salinity_var_name] = np.average(avg_salinity_pts)
-          wq_tests_data['hycom_min_salinity'] = avg_salinity_pts.min()
-          wq_tests_data['hycom_max_salinity'] = avg_salinity_pts.max()
+          wq_tests_data['ncsu_avg_salinity_24'] = np.average(avg_salinity_pts)
+          wq_tests_data['ncsu_min_salinity'] = avg_salinity_pts.min()
+          wq_tests_data['ncsu_max_salinity'] = avg_salinity_pts.max()
 
+          water_temp_data = self.ncsu_model.variables['temperature'][closest_start_ndx:closest_end_ndx,0,self.ncsu_latli:self.ncsu_latui,self.ncsu_lonli:self.ncsu_lonui]
+          avg_water_temp_pts = water_temp_data[0:closest_end_ndx-closest_start_ndx,pt.y,pt.x]
+          #Get the water temperature data
+          wq_tests_data['ncsu_avg_water_temp_24'] = np.average(avg_water_temp_pts)
+          wq_tests_data['ncsu_min_water_temp'] = avg_water_temp_pts.min()
+          wq_tests_data['ncsu_max_water_temp'] = avg_water_temp_pts.max()
           if self.logger:
-            cell_lat = self.hycom_lat_array[pt.y]
-            cell_lon = self.hycom_lon_array[pt.x]
-            self.logger.debug("Site: %s closest cell@ Lat: %f(%d) Lon: %f(%d) Salinity Avg: %f Min: %f Max: %f"\
-                              % (self.site.name, cell_lat, pt.x, cell_lon, pt.y, wq_tests_data[salinity_var_name], wq_tests_data['hycom_min_salinity'], wq_tests_data['hycom_max_salinity']))
+            cell_lat = self.ncsu_lat_array[pt.y]
+            cell_lon = self.ncsu_lon_array[pt.x]
+            begin_dt = beginning_time + timedelta(days=(self.ncsu_model_time[closest_start_ndx]))
+            end_dt = beginning_time + timedelta(days=(self.ncsu_model_time[closest_end_ndx]))
+            self.logger.debug("Site: %s Dates: %s to %s closest cell@ Lat: %f(%d) Lon: %f(%d) Salinity Avg: %f Water Temp Avg: %f"\
+                              % (self.site.name,\
+                                 begin_dt.strftime('%Y-%m-%dT%H:%M:%S'), end_dt.strftime('%Y-%m-%dT%H:%M:%S'),\
+                                 cell_lat, pt.x, cell_lon, pt.y,\
+                                 wq_tests_data['ncsu_avg_salinity_24'],wq_tests_data['ncsu_avg_water_temp_24']))
 
         except Exception, e:
           if self.logger:
@@ -248,53 +306,143 @@ class florida_wq_data(wq_data):
         self.logger.error("Date: %s out of range of data source." % (start_date))
 
     if self.logger:
-      self.logger.debug("Finished retrieving model salinity date: %s" % (start_date))
+      self.logger.debug("Finished retrieving ncsu model data: %s" % (start_date))
+    return
+
+  def get_hycom_model_data(self, start_date, wq_tests_data):
+    if self.logger:
+      self.logger.debug("Start retrieving hycom model data: %s" % (start_date))
+
+
+    beginning_time = timezone('UTC').localize(datetime.strptime('1900-12-31 00:00:00', '%Y-%m-%d %H:%M:%S'))
+    begin_date = start_date - timedelta(hours=24)
+    end_date = start_date
+    #Verify that the date we are interested should be in the hycom model data.
+    if begin_date >= (beginning_time + timedelta(days=self.hycom_model_time[0])):
+      start_time_delta = begin_date - beginning_time
+      end_time_delta = end_date - beginning_time
+
+      #The time dimension in the model is hours offset since the beginning_time above.
+      #offset_hours = (time_delta.days * 24) + (time_delta.seconds / (60 * 60 * 24))
+      offset_start = (start_time_delta.days) + (start_time_delta.seconds / (60.0 * 60.0 * 24.0))
+      offset_end = (end_time_delta.days) + (end_time_delta.seconds / (60.0 * 60.0 * 24.0))
+      closest_start_ndx = bisect_left(self.hycom_model_time, offset_start)
+      closest_end_ndx = bisect_left(self.hycom_model_time, offset_end)
+      if closest_start_ndx != -1 and closest_end_ndx != -1:
+        """
+        with open("/Users/danramage/tmp/salinity_model.csv", "w") as out_file:
+          out_file.write("Latitude,Longitude,Lat Ndx,Lon Ndx\n")
+          for lon_ndx in range(0,len(lon_array)):
+            for lat_ndx in range(0,len(lat_array)):
+              out_file.write("%f,%f,%d,%d\n" % (lat_array[lat_ndx], lon_array[lon_ndx], lat_ndx, lon_ndx))
+        """
+        try:
+          if self.logger:
+            self.logger.debug("Retrieving hycom salinity data.")
+          salinity_data = self.hycom_model.variables['salinity'][closest_start_ndx:closest_end_ndx,0,self.hycom_latli:self.hycom_latui,self.hycom_lonli:self.hycom_lonui]
+          pt = closestCellFromPtInPolygon(self.site.object_geometry,
+                                          self.hycom_lon_array, self.hycom_lat_array,
+                                          salinity_data[0],
+                                          self.hycom_model.variables['salinity']._FillValue,
+                                          self.model_within_polygon)
+          #Get the salinity data
+          avg_salinity_pts = salinity_data[0:closest_end_ndx-closest_start_ndx,pt.y,pt.x]
+          wq_tests_data['hycom_avg_salinity_24'] = np.average(avg_salinity_pts)
+          wq_tests_data['hycom_min_salinity'] = avg_salinity_pts.min()
+          wq_tests_data['hycom_max_salinity'] = avg_salinity_pts.max()
+
+          if self.logger:
+            self.logger.debug("Retrieving hycom water temp data.")
+          water_temp_data = self.hycom_model.variables['temperature'][closest_start_ndx:closest_end_ndx,0,self.hycom_latli:self.hycom_latui,self.hycom_lonli:self.hycom_lonui]
+          avg_water_temp_pts = water_temp_data[0:closest_end_ndx-closest_start_ndx,pt.y,pt.x]
+          #Get the water temperature data
+          wq_tests_data['hycom_avg_water_temp_24'] = np.average(avg_water_temp_pts)
+          wq_tests_data['hycom_min_water_temp'] = avg_water_temp_pts.min()
+          wq_tests_data['hycom_max_water_temp'] = avg_water_temp_pts.max()
+          if self.logger:
+            cell_lat = self.hycom_lat_array[pt.y]
+            cell_lon = self.hycom_lon_array[pt.x]
+            begin_dt = beginning_time + timedelta(days=(self.hycom_model_time[closest_start_ndx]))
+            end_dt = beginning_time + timedelta(days=(self.hycom_model_time[closest_end_ndx]))
+            self.logger.debug("Site: %s Dates: %s to %s closest cell@ Lat: %f(%d) Lon: %f(%d) Salinity Avg: %f Water Temp Avg: %f"\
+                              % (self.site.name,\
+                                 begin_dt.strftime('%Y-%m-%dT%H:%M:%S'), end_dt.strftime('%Y-%m-%dT%H:%M:%S'),\
+                                 cell_lat, pt.x, cell_lon, pt.y,\
+                                 wq_tests_data['hycom_avg_salinity_24'],wq_tests_data['hycom_avg_water_temp_24']))
+
+        except Exception, e:
+          if self.logger:
+            self.logger.exception(e)
+
+      else:
+        if self.logger:
+          self.logger.error("Cannot find start: %s or end: %s date range." % (offset_start, offset_end))
+    else:
+      if self.logger:
+        self.logger.error("Date: %s out of range of data source." % (start_date))
+
+    if self.logger:
+      self.logger.debug("Finished retrieving hycom model data: %s" % (start_date))
     return
 
 
   def get_tide_data(self, start_date, wq_tests_data):
     if self.logger:
       self.logger.debug("Start retrieving tide data for station: %s date: %s" % (self.tide_station, start_date))
-    tide = noaaTideData(use_raw=True, logger=self.logger)
-    #Date/Time format for the NOAA is YYYYMMDD
 
+    use_web_service = True
+    if self.tide_data_obj is not None:
+      use_web_service = False
+      date_key = start_date.strftime('%Y-%m-%dT%H:%M:%S')
+      if date_key in self.tide_data_obj:
+        tide_rec = self.tide_data_obj[date_key]
+        wq_tests_data['%s_tide_range' % (self.tide_station)] = tide_rec['range']
+        wq_tests_data['%s_tide_hi' % (self.tide_station)] = tide_rec['hi']
+        wq_tests_data['%s_tide_lo' % (self.tide_station)] = tide_rec['lo']
+      #THe web service is unreliable, so if we were using the history csv file, it may still be missing
+      #a record, if so, let's try to look it up on the web.
+      else:
+        use_web_service = True
+    if self.tide_data_obj is None or use_web_service:
+      tide = noaaTideData(use_raw=True, logger=self.logger)
+      #Date/Time format for the NOAA is YYYYMMDD
 
-    tide_data = tide.calcTideRange(beginDate = start_date.strftime('%Y%m%d'),
-                       endDate = start_date.strftime('%Y%m%d'),
-                       station=self.tide_station,
-                       datum='MLLW',
-                       units='feet',
-                       timezone='GMT',
-                       smoothData=False)
-    if tide_data and tide_data['HH'] is not None and tide_data['LL'] is not None:
       try:
-        range = tide_data['HH']['value'] - tide_data['LL']['value']
-      except TypeError, e:
+        tide_data = tide.calcTideRange(beginDate = start_date.strftime('%Y%m%d'),
+                           endDate = start_date.strftime('%Y%m%d'),
+                           station=self.tide_station,
+                           datum='MLLW',
+                           units='feet',
+                           timezone='GMT',
+                           smoothData=False)
+      except Exception,e:
         if self.logger:
           self.logger.exception(e)
       else:
-        #Save tide station values.
-        tide_station = self.tide_station
-        var_name = '%s_tide_range' % (tide_station)
-        wq_tests_data[var_name] = range
-        var_name = '%s_tide_hi' % (tide_station)
-        wq_tests_data[var_name] = tide_data['HH']['value']
-        var_name = '%s_tide_lo' % (tide_station)
-        wq_tests_data[var_name] = tide_data['LL']['value']
+        if tide_data and tide_data['HH'] is not None and tide_data['LL'] is not None:
+          try:
+            range = tide_data['HH']['value'] - tide_data['LL']['value']
+          except TypeError, e:
+            if self.logger:
+              self.logger.exception(e)
+          else:
+            #Save tide station values.
+            wq_tests_data['%s_tide_range' % (self.tide_station)] = range
+            wq_tests_data['%s_tide_hi' % (self.tide_station)] = tide_data['HH']['value']
+            wq_tests_data['%s_tide_lo' % (self.tide_station)] = tide_data['LL']['value']
+        else:
+          if self.logger:
+            self.logger.error("Tide data for station: %s date: %s not available or only partial." % (self.tide_station, start_date))
 
-        #Save subordinate station values
-        offset_hi = tide_data['HH']['value'] * self.tide_offset_settings['hi_tide_height_offset']
-        offset_lo = tide_data['LL']['value'] * self.tide_offset_settings['lo_tide_height_offset']
-        tide_station = self.tide_offset_settings['tide_station']
-        var_name = '%s_tide_range' % (tide_station)
-        wq_tests_data[var_name] = offset_hi - offset_lo
-        var_name = '%s_tide_hi' % (tide_station)
-        wq_tests_data[var_name] = offset_hi
-        var_name = '%s_tide_lo' % (tide_station)
-        wq_tests_data[var_name] = offset_lo
-    else:
-      if self.logger:
-        self.logger.error("Tide data for station: %s date: %s not available or only partial." % (self.tide_station, start_date))
+    #Save subordinate station values
+    if wq_tests_data['%s_tide_hi'%(self.tide_station)] != wq_defines.NO_DATA:
+      offset_hi = wq_tests_data['%s_tide_hi'%(self.tide_station)] * self.tide_offset_settings['hi_tide_height_offset']
+      offset_lo = wq_tests_data['%s_tide_lo'%(self.tide_station)] * self.tide_offset_settings['lo_tide_height_offset']
+
+      tide_station = self.tide_offset_settings['tide_station']
+      wq_tests_data['%s_tide_range' % (tide_station)] = offset_hi - offset_lo
+      wq_tests_data['%s_tide_hi' % (tide_station)] = offset_hi
+      wq_tests_data['%s_tide_lo' % (tide_station)] = offset_lo
 
     if self.logger:
       self.logger.debug("Finished retrieving tide data for station: %s date: %s" % (self.tide_station, start_date))
@@ -513,8 +661,11 @@ def create_historical_summary(config_file_name,
                               summary_out_file,
                               starting_date,
                               start_time_midnight,
+                              tide_csv_file,
                               use_logger=False):
   logger = None
+  if use_logger:
+    logger = logging.getLogger('create_historical_summary_logger')
   try:
     config_file = ConfigParser.RawConfigParser()
     config_file.read(config_file_name)
@@ -523,19 +674,27 @@ def create_historical_summary(config_file_name,
     sites_location_file = config_file.get('boundaries_settings', 'sample_sites')
     xenia_db_file = config_file.get('database', 'name')
     c_10_tds_url = config_file.get('c10_data', 'historical_qaqc_thredds')
-    salinity_model_tds_url = config_file.get('salinity_model_data', 'thredds_url')
-    salinity_model_bbox = config_file.get('salinity_model_data', 'bbox').split(',')
-    poly_parts = config_file.get('salinity_model_data', 'within_polygon').split(';')
-    salinity_model_within_polygon = [(float(lon_lat.split(',')[0]), float(lon_lat.split(',')[1])) for lon_lat in poly_parts]
+    hycom_model_tds_url = config_file.get('hycom_model_data', 'thredds_url')
+    model_bbox = config_file.get('hycom_model_data', 'bbox').split(',')
+    poly_parts = config_file.get('hycom_model_data', 'within_polygon').split(';')
+    model_within_polygon = [(float(lon_lat.split(',')[0]), float(lon_lat.split(',')[1])) for lon_lat in poly_parts]
+
+    ncsu_model_tds_url = config_file.get('ncsu_model_data', 'thredds_url')
 
   except ConfigParser, e:
     if logger:
       logger.exception(e)
   else:
+    #Load the sample site information. Has name, location and the boundaries that contain the site.
     fl_sites = florida_sample_sites(True)
     fl_sites.load_sites(file_name=sites_location_file, boundary_file=boundaries_location_file)
-    if use_logger:
-      logger = logging.getLogger('create_historical_summary_logger')
+
+    #If we provide a tide file that has the historical data, we'll load it instead of using
+    #the SOAP webservice.
+    tide_file = None
+    if len(tide_csv_file):
+      tide_file = tide_data_file(logger=True)
+      tide_file.open(tide_csv_file)
     try:
       wq_file = open(historical_wq_file, "rU")
       wq_history_file = csv.DictReader(wq_file, delimiter=',', quotechar='"', fieldnames=header_row)
@@ -550,7 +709,6 @@ def create_historical_summary(config_file_name,
       output_keys = ['station_name', 'sample_date', 'enterococcus_value', 'enterococcus_code', 'autonumber', 'County']
 
       sites_not_found = []
-      wq_data_obj = []
       current_site = None
       processed_sites = []
       #stop_date = eastern.localize(datetime.strptime('2014-01-29 00:00:00', '%Y-%m-%d %H:%M:%S'))
@@ -558,9 +716,10 @@ def create_historical_summary(config_file_name,
       try:
         fl_wq_data = florida_wq_data(xenia_database_name=xenia_db_file,
                                       c_10_tds_url=c_10_tds_url,
-                                      salinity_model_tds_url=salinity_model_tds_url,
-                                      salinity_model_bbox=salinity_model_bbox,
-                                      salinity_model_within_polygon=salinity_model_within_polygon,
+                                      hycom_model_tds_url=hycom_model_tds_url,
+                                      ncsu_model_tds_url=ncsu_model_tds_url,
+                                      model_bbox=model_bbox,
+                                      model_within_polygon=model_within_polygon,
                                       use_logger=True)
       except Exception, e:
         if logger:
@@ -599,86 +758,62 @@ def create_historical_summary(config_file_name,
               #Convert to UTC
               wq_utc_date = wq_date.astimezone(timezone('UTC'))
 
-            if (starting_date is not None and wq_utc_date >= starting_date) or (starting_date is None):
-              if fl_sites.get_site(cleaned_site_name):
-                new_outfile = False
-                if current_site != cleaned_site_name:
-                  #Initialize site name
-                  if current_site != None:
-                    site_data_file.close()
+              if (starting_date is not None and wq_utc_date >= starting_date) or (starting_date is None):
+                if fl_sites.get_site(cleaned_site_name):
+                  new_outfile = False
+                  if current_site != cleaned_site_name:
+                    #Initialize site name
+                    if current_site != None:
+                      site_data_file.close()
 
-                  current_site = cleaned_site_name
-                  append_file = False
-                  if current_site in processed_sites:
-                    if logger:
-                      logger.debug("Site: %s has been found again, data is not ordered.")
-                    append_file = True
-                  else:
-                    processed_sites.append(current_site)
-                  #We need to create a new data access object using the boundaries for the station.
-                  site = fl_sites.get_site(cleaned_site_name)
-                  try:
-                    #Get the station specific tide stations
-                    tide_station = config_file.get(cleaned_site_name, 'tide_station')
-                    offset_tide_station = config_file.get(cleaned_site_name, 'offset_tide_station')
-                    tide_offset_settings = {
-                      'tide_station': config_file.get(offset_tide_station, 'station_id'),
-                      'hi_tide_time_offset': config_file.getint(offset_tide_station, 'hi_tide_time_offset'),
-                      'lo_tide_time_offset': config_file.getint(offset_tide_station, 'lo_tide_time_offset'),
-                      'hi_tide_height_offset': config_file.getfloat(offset_tide_station, 'hi_tide_height_offset'),
-                      'lo_tide_height_offset': config_file.getfloat(offset_tide_station, 'lo_tide_height_offset')
-                    }
-
-                  except ConfigParser.Error, e:
-                    if logger:
-                      logger.exception(e)
-
-                  fl_wq_data.reset(site=site,
-                                    tide_station=tide_station,
-                                    tide_offset_params=tide_offset_settings)
-
-                  clean_filename = cleaned_site_name.replace(' ', '_')
-                  sample_site_filename = "%s/%s-Historical.csv" % (summary_out_file, clean_filename)
-                  write_header = True
-                  try:
-                    if not append_file:
+                    current_site = cleaned_site_name
+                    append_file = False
+                    if current_site in processed_sites:
                       if logger:
-                        logger.debug("Opening sample site history file: %s" % (sample_site_filename))
-                      site_data_file = open(sample_site_filename, 'w')
+                        logger.debug("Site: %s has been found again, data is not ordered.")
+                      append_file = True
                     else:
-                      if logger:
-                        logger.debug("Opening sample site history file with append: %s" % (sample_site_filename))
-                      site_data_file = open(sample_site_filename, 'a')
-                      write_header = False
-                  except IOError, e:
-                    if logger:
-                      logger.exception(e)
-                    raise e
-
-                date_val = row['Date']
-                time_val = row['SampleTime']
-                if len(date_val):
-                  #Date does not have leading 0s sometimes, so we add them.
-                  date_parts = date_val.split('/')
-                  date_val = "%02d/%02d/%02d" % (int(date_parts[0]), int(date_parts[1]), int(date_parts[2]))
-                  if len(time_val) == 0:
-                    time_val = '00:00:00'
-                  #Time doesn't have leading 0's so add them
-                  else:
-                    hours_mins = time_val.split(':')
-                    time_val = "%02d:%02d:00" % (int(hours_mins[0]), int(hours_mins[1]))
-                  try:
-                    wq_date = eastern.localize(datetime.strptime('%s %s' % (date_val, time_val), '%m/%d/%y %H:%M:%S'))
-                  except ValueError, e:
+                      processed_sites.append(current_site)
+                    #We need to create a new data access object using the boundaries for the station.
+                    site = fl_sites.get_site(cleaned_site_name)
                     try:
-                      wq_date = eastern.localize(datetime.strptime('%s %s' % (date_val, time_val), '%m/%d/%Y %H:%M:%S'))
-                    except ValueError, e:
+                      #Get the station specific tide stations
+                      tide_station = config_file.get(cleaned_site_name, 'tide_station')
+                      offset_tide_station = config_file.get(cleaned_site_name, 'offset_tide_station')
+                      tide_offset_settings = {
+                        'tide_station': config_file.get(offset_tide_station, 'station_id'),
+                        'hi_tide_time_offset': config_file.getint(offset_tide_station, 'hi_tide_time_offset'),
+                        'lo_tide_time_offset': config_file.getint(offset_tide_station, 'lo_tide_time_offset'),
+                        'hi_tide_height_offset': config_file.getfloat(offset_tide_station, 'hi_tide_height_offset'),
+                        'lo_tide_height_offset': config_file.getfloat(offset_tide_station, 'lo_tide_height_offset')
+                      }
+
+                    except ConfigParser.Error, e:
                       if logger:
-                        logger.error("Processing halted at line: %d" % (line_num))
                         logger.exception(e)
-                      sys.exit(-1)
-                  #Convert to UTC
-                  wq_utc_date = wq_date.astimezone(timezone('UTC'))
+
+                    fl_wq_data.reset(site=site,
+                                      tide_station=tide_station,
+                                      tide_offset_params=tide_offset_settings,
+                                      tide_data_obj=tide_file)
+
+                    clean_filename = cleaned_site_name.replace(' ', '_')
+                    sample_site_filename = "%s/%s-Historical.csv" % (summary_out_file, clean_filename)
+                    write_header = True
+                    try:
+                      if not append_file:
+                        if logger:
+                          logger.debug("Opening sample site history file: %s" % (sample_site_filename))
+                        site_data_file = open(sample_site_filename, 'w')
+                      else:
+                        if logger:
+                          logger.debug("Opening sample site history file with append: %s" % (sample_site_filename))
+                        site_data_file = open(sample_site_filename, 'a')
+                        write_header = False
+                    except IOError, e:
+                      if logger:
+                        logger.exception(e)
+                      raise e
                   if logger:
                     logger.debug("Start building historical wq data for: %s Date/Time UTC: %s/EST: %s" % (row['SPLocation'], wq_utc_date, wq_date))
                   site_data = OrderedDict([('autonumber', row['autonumber']),
@@ -719,18 +854,17 @@ def create_historical_summary(config_file_name,
 
 
 
-              else:
-                try:
-                  sites_not_found.index(row['SPLocation'])
-                except ValueError,e:
-                  sites_not_found.append(row['SPLocation'])
+                else:
+                  try:
+                    sites_not_found.index(row['SPLocation'])
+                  except ValueError,e:
+                    sites_not_found.append(row['SPLocation'])
 
           line_num += 1
       wq_file.close()
       if logger:
         logger.debug("Stations not matching: %s" % (", ".join(sites_not_found)))
 
-  return
 
 def main():
   parser = optparse.OptionParser()
@@ -753,6 +887,8 @@ def main():
   parser.add_option("-m", "--StartTimeMidnight", dest="start_time_midnight",
                     action="store_true", default=True,
                     help="Set time to 00:00:00 for the queries instead of the sample time." )
+  parser.add_option("-t", "--TideDataFile", dest="tide_data_file",
+                    help="If used, this is the path to a tide data csv file.", default=None )
 
 
   (options, args) = parser.parse_args()
@@ -786,6 +922,7 @@ def main():
                                 options.summary_out_path,
                                 starting_date,
                                 options.start_time_midnight,
+                                options.tide_data_file,
                                 True)
   if logger:
     logger.info("Log file closed.")
