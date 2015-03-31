@@ -7,7 +7,7 @@ import logging.config
 import optparse
 import ConfigParser
 import csv
-from datetime import datetime
+from datetime import datetime, timedelta
 from pytz import timezone
 
 #import scipy.io as sio
@@ -492,8 +492,9 @@ def import_tide_data(config_file, output_file, start_time_midnight):
                 #Convert to UTC
                 wq_utc_date = wq_date.astimezone(timezone('UTC'))
                 tide = noaaTideData(use_raw=True, logger=logger)
-                #Date/Time format for the NOAA is YYYYMMDD
-                tide_time = wq_utc_date.strftime('%Y%m%d')
+                #Date/Time format for the NOAA is YYYYMMDD, get previous 24 hours.
+                tide_start_time = (wq_utc_date - timedelta(hours=24))
+                tide_end_time = wq_utc_date
                 date_key = wq_utc_date.strftime('%Y-%m-%dT%H:%M:%S')
                 if len(initial_tide_data):
                   if date_key in initial_tide_data:
@@ -506,19 +507,19 @@ def import_tide_data(config_file, output_file, start_time_midnight):
                                             initial_tide_data[date_key]['hi'],
                                             initial_tide_data[date_key]['lo']))
 
-                    tide_time = None
+                    tide_start_time = None
                 else:
                   if logger:
                     logger.debug("Station: %s date: %s not in history file, retrieving." % (tide_station, wq_utc_date.strftime("%Y-%m-%dT%H:%M:%S")))
-                  tide_time = wq_utc_date.strftime('%Y%m%d')
+
                 if logger:
-                  logger.debug("Start retrieving tide data for station: %s date: %s" % (tide_station, wq_utc_date.strftime("%Y-%m-%dT%H:%M:%S")))
-                if tide_time is not None:
+                  logger.debug("Start retrieving tide data for station: %s date: %s-%s" % (tide_station, tide_start_time, tide_end_time))
+                if tide_start_time is not None:
                   for x in range(0, 5):
                     if logger:
                       logger.debug("Attempt: %d retrieving tide data for station." % (x+1))
-                    tide_data = tide.calcTideRange(beginDate = tide_time,
-                                       endDate = wq_utc_date.strftime('%Y%m%d'),
+                    tide_data = tide.calcTideRange(beginDate = tide_start_time,
+                                       endDate = tide_end_time,
                                        station=tide_station,
                                        datum='MLLW',
                                        units='feet',
@@ -574,13 +575,13 @@ def main():
                     help="" )
   parser.add_option("-d", "--MatlabDataType", dest="matlab_data_type",
                     help="" )
-  parser.add_option("-t", "--ImportTideData", dest="ImportTideData",
+  parser.add_option("-t", "--ImportTideData", dest="import_tide_data",
                     action="store_true", default=False,
                     help="" )
   parser.add_option("-f", "--TideDataFile", dest="tide_csv_file",
                     help="" )
-  parser.add_option("-f", "--StartAtMidnight", dest="start_at_midnight",
-                    help="", default=False )
+  parser.add_option("-s", "--StartAtMidnight", dest="start_at_midnight",
+                    help="", action="store_true", default=False )
 
 
   (options, args) = parser.parse_args()
@@ -605,7 +606,7 @@ def main():
     traceback.print_exc(e)
     sys.exit(-1)
   else:
-    if options.ImportTideData and len(options.tide_csv_file):
+    if options.import_tide_data and len(options.tide_csv_file):
       import_tide_data(options.config_file, options.tide_csv_file, options.start_at_midnight)
 
     if options.nws_directory is not None and len(options.nws_directory):

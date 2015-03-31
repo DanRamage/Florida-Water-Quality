@@ -7,6 +7,8 @@ import time
 from datetime import datetime
 from pytz import timezone as pytz_timezone
 from date_time_utils import get_utc_epoch, datetime2matlabdn
+import array
+
 #import matplotlib
 #matplotlib.use('Agg')
 #import matplotlib.pyplot as plt
@@ -65,8 +67,8 @@ class noaaTideData(object):
     return(data)
 
   """
-  beginDate is the date we wish to start our data query at. Format is: YYYYMMDD
-  endDate is the date we wish to end our data query at. Format is: YYYYMMDD
+  beginDate is a datetime object we wish to start our data query at.
+  endDate is a datetime object we wish to end our data query at.
   waterLevelSensorDataType is the type of water level we want. Can be:
     W1 = Six minute interval data
     W2 = Hourly water level data
@@ -111,9 +113,7 @@ class noaaTideData(object):
                     timezone='GMT',
                     smoothData=False,                    
                     tideFileDir=None):
-    import array
-    import math
-    
+
     #This is the dictionary we return. Its keys are the tide indicators: LL is Lowest Low Tide, L is Low Tide, HH Highest High Tide, H High tide.
     tideData = {}
     tideData['LL'] = None
@@ -122,11 +122,12 @@ class noaaTideData(object):
     tideData['H'] = None
     tideData['PeakValue'] = None
     tideData['ValleyValue'] = None
+
     try:
       if self.use_raw:
-        wlData = self.getWaterLevelRawSixMinuteData(beginDate, endDate, station, datum, units, timezone)
+        wlData = self.getWaterLevelRawSixMinuteData(beginDate.strftime('%Y%m%d'), endDate.strftime('%Y%m%d'), station, datum, units, timezone)
       else:
-        wlData = self.getWaterLevelVerifiedSixMinuteData(beginDate, endDate, station, datum, units, timezone)
+        wlData = self.getWaterLevelVerifiedSixMinuteData(beginDate.strftime('%Y%m%d'), endDate.strftime('%Y%m%d'), station, datum, units, timezone)
     except (WebFault,Exception) as e:
       if self.logger:
         self.logger.exception(e)
@@ -141,15 +142,24 @@ class noaaTideData(object):
       ndx = 0
       alpha = 0.5
       utc_tz = pytz_timezone('UTC')
-      while ndx < dataLen:
-
+      start_ndx = None
+      end_ndx = None
+      for ndx in range(0, dataLen):
+        wl_time = utc_tz.localize(datetime.strptime(wlData.item[ndx]['timeStamp'], '%Y-%m-%d %H:%M:%S.0'))
+        if start_ndx is None and wl_time >= beginDate:
+          start_ndx = ndx
+        if end_ndx is None and wl_time > endDate:
+          end_ndx = ndx-1
+      wlData.item = wlData.item[start_ndx:end_ndx]
+      dataLen = len(wlData.item)
+      for ndx in range(0, dataLen):
         valN = wlData.item[ndx]['WL']
         #tidePts.append(valN)
         #data_ts = utc_tz.localize(datetime.strptime(wlData.item[ndx]['timeStamp'], '%Y-%m-%d %H:%M:%S.0'))
         #timePts.append(int(get_utc_epoch(data_ts)))
         #Then the formula for each successive point is (alpha * Xn) + (1-alpha) * Yn-1
         #X is the original data, Yn-1 is the last smoothed data point, alpha is the smoothing constant.
-        if(ndx == 0):
+        if ndx == 0:
           expSmoothedData.append(valN)
           tideMin1 = valN
           tideMax1 = valN
@@ -176,7 +186,8 @@ class noaaTideData(object):
           #ROC for the raw data.
           valN1 = wlData.item[ndx-1]['WL']
           rawDataROC.append((valN - valN1) / (timeN - timeN1))
-        ndx += 1
+
+
 
       ndx = 0
       a = None
