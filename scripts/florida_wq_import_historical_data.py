@@ -433,7 +433,7 @@ def import_c10_matlab_data(matlab_file):
 
   return
 
-def import_tide_data(config_file, output_file):
+def import_tide_data(config_file, output_file, start_time_midnight):
   logger = logging.getLogger('import_nws_data_logger')
 
   configFile = ConfigParser.RawConfigParser()
@@ -465,95 +465,98 @@ def import_tide_data(config_file, output_file):
           #Check to see if the site is one we are using
           if line_num > 0:
             cleaned_site_name = row['SPLocation'].replace("  ", " ")
-
-            date_val = row['Date']
-            time_val = row['SampleTime']
-            if len(date_val):
-              #Date does not have leading 0s sometimes, so we add them.
-              date_parts = date_val.split('/')
-              date_val = "%02d/%02d/%02d" % (int(date_parts[0]), int(date_parts[1]), int(date_parts[2]))
-              #If we want to use midnight as the starting time, or we did not have a sample time.
-              if len(time_val) == 0:
-                time_val = '00:00:00'
-              #Time doesn't have leading 0's so add them
-              else:
-                hours_mins = time_val.split(':')
-                time_val = "%02d:%02d:00" % (int(hours_mins[0]), int(hours_mins[1]))
-              try:
-                wq_date = eastern.localize(datetime.strptime('%s %s' % (date_val, time_val), '%m/%d/%y %H:%M:%S'))
-              except ValueError, e:
+            if fl_sites.get_site(cleaned_site_name):
+              date_val = row['Date']
+              time_val = row['SampleTime']
+              if len(date_val):
+                #Date does not have leading 0s sometimes, so we add them.
+                date_parts = date_val.split('/')
+                date_val = "%02d/%02d/%02d" % (int(date_parts[0]), int(date_parts[1]), int(date_parts[2]))
+                #If we want to use midnight as the starting time, or we did not have a sample time.
+                if start_time_midnight or len(time_val) == 0:
+                  time_val = '00:00:00'
+                #Time doesn't have leading 0's so add them
+                else:
+                  hours_mins = time_val.split(':')
+                  time_val = "%02d:%02d:00" % (int(hours_mins[0]), int(hours_mins[1]))
                 try:
-                  wq_date = eastern.localize(datetime.strptime('%s %s' % (date_val, time_val), '%m/%d/%Y %H:%M:%S'))
+                  wq_date = eastern.localize(datetime.strptime('%s %s' % (date_val, time_val), '%m/%d/%y %H:%M:%S'))
                 except ValueError, e:
-                  if logger:
-                    logger.error("Processing halted at line: %d" % (line_num))
-                    logger.exception(e)
-                  sys.exit(-1)
-              #Convert to UTC
-              wq_utc_date = wq_date.astimezone(timezone('UTC'))
-              tide = noaaTideData(use_raw=True, logger=logger)
-              #Date/Time format for the NOAA is YYYYMMDD
-              tide_time = wq_utc_date.strftime('%Y%m%d')
-              date_key = wq_utc_date.strftime('%Y-%m-%dT%H:%M:%S')
-              if len(initial_tide_data):
-                if date_key in initial_tide_data:
-                  if logger:
-                    logger.debug("Station: %s date: %s in history file, not retrieving." % (tide_station, wq_utc_date.strftime("%Y-%m-%dT%H:%M:%S")))
-                  tide_csv_file.write("%s,%s,%f,%f,%f\n"\
-                                       % (tide_station,
-                                          wq_utc_date.strftime("%Y-%m-%dT%H:%M:%S"),
-                                          initial_tide_data[date_key]['range'],
-                                          initial_tide_data[date_key]['hi'],
-                                          initial_tide_data[date_key]['lo']))
-
-                  tide_time = None
-              else:
-                if logger:
-                  logger.debug("Station: %s date: %s not in history file, retrieving." % (tide_station, wq_utc_date.strftime("%Y-%m-%dT%H:%M:%S")))
-                tide_time = wq_utc_date.strftime('%Y%m%d')
-              if logger:
-                logger.debug("Start retrieving tide data for station: %s date: %s" % (tide_station, wq_utc_date.strftime("%Y-%m-%dT%H:%M:%S")))
-              if tide_time is not None:
-                for x in range(0, 5):
-                  if logger:
-                    logger.debug("Attempt: %d retrieving tide data for station." % (x+1))
-                  tide_data = tide.calcTideRange(beginDate = tide_time,
-                                     endDate = wq_utc_date.strftime('%Y%m%d'),
-                                     station=tide_station,
-                                     datum='MLLW',
-                                     units='feet',
-                                     timezone='GMT',
-                                     smoothData=False)
-                  if tide_data and tide_data['HH'] is not None and tide_data['LL'] is not None:
-                    try:
-                      tide_range = tide_data['HH']['value'] - tide_data['LL']['value']
-                      #Save tide station values.
-                      tide_hi = tide_data['HH']['value']
-                      tide_lo = tide_data['LL']['value']
-                    except TypeError, e:
-                      if logger:
-                        logger.exception(e)
-                  else:
+                  try:
+                    wq_date = eastern.localize(datetime.strptime('%s %s' % (date_val, time_val), '%m/%d/%Y %H:%M:%S'))
+                  except ValueError, e:
                     if logger:
-                      logger.error("Tide data for station: %s date: %s not available or only partial, using Peak data." % (tide_station, wq_utc_date.strftime("%Y-%m-%dT%H:%M:%S")))
-                    try:
-                      tide_hi = tide_data['PeakValue']['value']
-                      tide_lo = tide_data['ValleyValue']['value']
-                      tide_range = tide_hi - tide_lo
-                    except TypeError, e:
-                      if logger:
-                        logger.exception(e)
-
-                  if tide_range is not None:
+                      logger.error("Processing halted at line: %d" % (line_num))
+                      logger.exception(e)
+                    sys.exit(-1)
+                #Convert to UTC
+                wq_utc_date = wq_date.astimezone(timezone('UTC'))
+                tide = noaaTideData(use_raw=True, logger=logger)
+                #Date/Time format for the NOAA is YYYYMMDD
+                tide_time = wq_utc_date.strftime('%Y%m%d')
+                date_key = wq_utc_date.strftime('%Y-%m-%dT%H:%M:%S')
+                if len(initial_tide_data):
+                  if date_key in initial_tide_data:
+                    if logger:
+                      logger.debug("Station: %s date: %s in history file, not retrieving." % (tide_station, wq_utc_date.strftime("%Y-%m-%dT%H:%M:%S")))
                     tide_csv_file.write("%s,%s,%f,%f,%f\n"\
-                         % (tide_station,wq_utc_date.strftime("%Y-%m-%dT%H:%M:%S"),tide_range,tide_hi,tide_lo))
-                    break
+                                         % (tide_station,
+                                            wq_utc_date.strftime("%Y-%m-%dT%H:%M:%S"),
+                                            initial_tide_data[date_key]['range'],
+                                            initial_tide_data[date_key]['hi'],
+                                            initial_tide_data[date_key]['lo']))
 
+                    tide_time = None
+                else:
+                  if logger:
+                    logger.debug("Station: %s date: %s not in history file, retrieving." % (tide_station, wq_utc_date.strftime("%Y-%m-%dT%H:%M:%S")))
+                  tide_time = wq_utc_date.strftime('%Y%m%d')
+                if logger:
+                  logger.debug("Start retrieving tide data for station: %s date: %s" % (tide_station, wq_utc_date.strftime("%Y-%m-%dT%H:%M:%S")))
+                if tide_time is not None:
+                  for x in range(0, 5):
+                    if logger:
+                      logger.debug("Attempt: %d retrieving tide data for station." % (x+1))
+                    tide_data = tide.calcTideRange(beginDate = tide_time,
+                                       endDate = wq_utc_date.strftime('%Y%m%d'),
+                                       station=tide_station,
+                                       datum='MLLW',
+                                       units='feet',
+                                       timezone='GMT',
+                                       smoothData=False)
+                    if tide_data and tide_data['HH'] is not None and tide_data['LL'] is not None:
+                      try:
+                        tide_range = tide_data['HH']['value'] - tide_data['LL']['value']
+                        #Save tide station values.
+                        tide_hi = tide_data['HH']['value']
+                        tide_lo = tide_data['LL']['value']
+                      except TypeError, e:
+                        if logger:
+                          logger.exception(e)
+                    else:
+                      if logger:
+                        logger.error("Tide data for station: %s date: %s not available or only partial, using Peak data." % (tide_station, wq_utc_date.strftime("%Y-%m-%dT%H:%M:%S")))
+                      try:
+                        tide_hi = tide_data['PeakValue']['value']
+                        tide_lo = tide_data['ValleyValue']['value']
+                        tide_range = tide_hi - tide_lo
+                      except TypeError, e:
+                        if logger:
+                          logger.exception(e)
 
+                    if tide_range is not None:
+                      tide_csv_file.write("%s,%s,%f,%f,%f\n"\
+                           % (tide_station,wq_utc_date.strftime("%Y-%m-%dT%H:%M:%S"),tide_range,tide_hi,tide_lo))
+                      break
+
+                if logger:
+                  logger.debug("Finished retrieving tide data for station: %s date: %s" % (tide_station, wq_utc_date.strftime("%Y-%m-%dT%H:%M:%S")))
+            else:
               if logger:
-                logger.debug("Finished retrieving tide data for station: %s date: %s" % (tide_station, wq_utc_date.strftime("%Y-%m-%dT%H:%M:%S")))
+                logger.debug("Station: %s not in list to process." % (cleaned_site_name))
 
           line_num += 1
+
   except IOError, e:
     if logger:
       logger.exception(e)
@@ -576,6 +579,8 @@ def main():
                     help="" )
   parser.add_option("-f", "--TideDataFile", dest="tide_csv_file",
                     help="" )
+  parser.add_option("-f", "--StartAtMidnight", dest="start_at_midnight",
+                    help="", default=False )
 
 
   (options, args) = parser.parse_args()
@@ -601,7 +606,7 @@ def main():
     sys.exit(-1)
   else:
     if options.ImportTideData and len(options.tide_csv_file):
-      import_tide_data(options.config_file, options.tide_csv_file)
+      import_tide_data(options.config_file, options.tide_csv_file, options.start_at_midnight)
 
     if options.nws_directory is not None and len(options.nws_directory):
       import_nws_data(options.nws_directory, xenia_db)

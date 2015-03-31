@@ -885,7 +885,7 @@ def main():
   parser.add_option("-d", "--StartDate", dest="starting_date",
                     help="Date to use for the retrieval." )
   parser.add_option("-m", "--StartTimeMidnight", dest="start_time_midnight",
-                    action="store_true", default=True,
+                    action="store_true", default=False,
                     help="Set time to 00:00:00 for the queries instead of the sample time." )
   parser.add_option("-t", "--TideDataFile", dest="tide_data_file",
                     help="If used, this is the path to a tide data csv file.", default=None )
