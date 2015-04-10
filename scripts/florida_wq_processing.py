@@ -12,7 +12,7 @@ import netCDF4 as nc
 from netcdftime import DateFromJulianDay
 import numpy as np
 from math import isnan
-from bisect import bisect_left
+from bisect import bisect_left, bisect_right, bisect
 
 from collections import OrderedDict
 from shapely.geometry import Polygon
@@ -181,18 +181,18 @@ class florida_wq_data(wq_data):
     if self.logger:
       self.logger.debug("Creating and initializing data dict.")
     #Build variables for the base tide station.
-    var_name = '%s_tide_range' % (self.tide_station)
+    var_name = 'tide_range_%s' % (self.tide_station)
     wq_tests_data[var_name] = wq_defines.NO_DATA
-    var_name = '%s_tide_hi' % (self.tide_station)
+    var_name = 'tide_hi_%s' % (self.tide_station)
     wq_tests_data[var_name] = wq_defines.NO_DATA
-    var_name = '%s_tide_lo' % (self.tide_station)
+    var_name = 'tide_lo_%s' % (self.tide_station)
     wq_tests_data[var_name] = wq_defines.NO_DATA
     #Build variables for the subordinate tide station.
-    var_name = '%s_tide_range' % (self.tide_offset_settings['tide_station'])
+    var_name = 'tide_range_%s' % (self.tide_offset_settings['tide_station'])
     wq_tests_data[var_name] = wq_defines.NO_DATA
-    var_name = '%s_tide_hi' % (self.tide_offset_settings['tide_station'])
+    var_name = 'tide_hi_%s' % (self.tide_offset_settings['tide_station'])
     wq_tests_data[var_name] = wq_defines.NO_DATA
-    var_name = '%s_tide_lo' % (self.tide_offset_settings['tide_station'])
+    var_name = 'tide_lo_%s' % (self.tide_offset_settings['tide_station'])
     wq_tests_data[var_name] = wq_defines.NO_DATA
 
     wq_tests_data['nws_ksrq_avg_wspd'] = wq_defines.NO_DATA
@@ -201,37 +201,54 @@ class florida_wq_data(wq_data):
     for boundary in self.site.contained_by:
       if len(boundary.name):
         for prev_hours in range(24, 192, 24):
-          var_name = '%s_summary_%d' % (boundary.name.lower().replace(' ', '_'), prev_hours)
+          clean_var_boundary_name = boundary.name.lower().replace(' ', '_')
+          var_name = '%s_nexrad_summary_%d' % (clean_var_boundary_name, prev_hours)
           wq_tests_data[var_name] = wq_defines.NO_DATA
 
-        var_name = '%s_dry_days_count' % (boundary.name.lower().replace(' ', '_'))
+        var_name = '%s_nexrad_dry_days_count' % (clean_var_boundary_name)
         wq_tests_data[var_name] = wq_defines.NO_DATA
 
-        var_name = '%s_rainfall_intesity' % (boundary.name.lower().replace(' ', '_'))
+        var_name = '%s_nexrad_rainfall_intesity' % (clean_var_boundary_name)
         wq_tests_data[var_name] = wq_defines.NO_DATA
 
-    wq_tests_data['c10_avg_salinity_24'] = wq_defines.NO_DATA
-    #wq_tests_data['c10_salinity_rec_cnt'] = wq_defines.NO_DATA
-    wq_tests_data['c10_min_salinity'] = wq_defines.NO_DATA
-    wq_tests_data['c10_max_salinity'] = wq_defines.NO_DATA
+        var_name = '%s_nexrad_total_1_day_delay' % (clean_var_boundary_name)
+        wq_tests_data[var_name] = wq_defines.NO_DATA
+        var_name = '%s_nexrad_total_2_day_delay' % (clean_var_boundary_name)
+        wq_tests_data[var_name] = wq_defines.NO_DATA
+        var_name = '%s_nexrad_total_3_day_delay' % (clean_var_boundary_name)
+        wq_tests_data[var_name] = wq_defines.NO_DATA
+
+
+    for prev_hours in range(24, 192, 24):
+      wq_tests_data['c10_avg_salinity_%d' % (prev_hours)] = wq_defines.NO_DATA
+      wq_tests_data['c10_min_salinity_%d' % (prev_hours)] = wq_defines.NO_DATA
+      wq_tests_data['c10_max_salinity_%d' % (prev_hours)] = wq_defines.NO_DATA
+
     wq_tests_data['c10_avg_water_temp_24'] = wq_defines.NO_DATA
-    #wq_tests_data['c10_water_temp_rec_cnt'] = wq_defines.NO_DATA
     wq_tests_data['c10_min_water_temp'] = wq_defines.NO_DATA
     wq_tests_data['c10_max_water_temp'] = wq_defines.NO_DATA
 
-    wq_tests_data['hycom_avg_salinity_24'] = wq_defines.NO_DATA
-    wq_tests_data['hycom_min_salinity'] = wq_defines.NO_DATA
-    wq_tests_data['hycom_max_salinity'] = wq_defines.NO_DATA
+    for hour in range(24,192,24):
+      wq_tests_data['hycom_avg_salinity_%d' % (hour)] = wq_defines.NO_DATA
+      wq_tests_data['hycom_min_salinity_%d' % (hour)] = wq_defines.NO_DATA
+      wq_tests_data['hycom_max_salinity_%d' % (hour)] = wq_defines.NO_DATA
+
+    #wq_tests_data['hycom_avg_salinity_24'] = wq_defines.NO_DATA
+    #wq_tests_data['hycom_min_salinity'] = wq_defines.NO_DATA
+    #wq_tests_data['hycom_max_salinity'] = wq_defines.NO_DATA
+
     wq_tests_data['hycom_avg_water_temp_24'] = wq_defines.NO_DATA
     wq_tests_data['hycom_min_water_temp'] = wq_defines.NO_DATA
     wq_tests_data['hycom_max_water_temp'] = wq_defines.NO_DATA
 
+    """
     wq_tests_data['ncsu_avg_salinity_24'] = wq_defines.NO_DATA
     wq_tests_data['ncsu_min_salinity'] = wq_defines.NO_DATA
     wq_tests_data['ncsu_max_salinity'] = wq_defines.NO_DATA
     wq_tests_data['ncsu_avg_water_temp_24'] = wq_defines.NO_DATA
     wq_tests_data['ncsu_min_water_temp'] = wq_defines.NO_DATA
     wq_tests_data['ncsu_max_water_temp'] = wq_defines.NO_DATA
+    """
     if self.logger:
       self.logger.debug("Finished creating and initializing data dict.")
 
@@ -313,16 +330,16 @@ class florida_wq_data(wq_data):
     if self.logger:
       self.logger.debug("Start retrieving hycom model data: %s" % (start_date))
 
-
+    #Hycom time is referenced in days since 1900-12-31.
     beginning_time = timezone('UTC').localize(datetime.strptime('1900-12-31 00:00:00', '%Y-%m-%d %H:%M:%S'))
-    begin_date = start_date - timedelta(hours=24)
+    begin_date = start_date - timedelta(hours=192)
     end_date = start_date
     #Verify that the date we are interested should be in the hycom model data.
     if begin_date >= (beginning_time + timedelta(days=self.hycom_model_time[0])):
       start_time_delta = begin_date - beginning_time
       end_time_delta = end_date - beginning_time
 
-      #The time dimension in the model is hours offset since the beginning_time above.
+      #The time dimension in the model is days offset since the beginning_time above.
       #offset_hours = (time_delta.days * 24) + (time_delta.seconds / (60 * 60 * 24))
       offset_start = (start_time_delta.days) + (start_time_delta.seconds / (60.0 * 60.0 * 24.0))
       offset_end = (end_time_delta.days) + (end_time_delta.seconds / (60.0 * 60.0 * 24.0))
@@ -339,22 +356,95 @@ class florida_wq_data(wq_data):
         try:
           if self.logger:
             self.logger.debug("Retrieving hycom salinity data.")
-          salinity_data = self.hycom_model.variables['salinity'][closest_start_ndx:closest_end_ndx,0,self.hycom_latli:self.hycom_latui,self.hycom_lonli:self.hycom_lonui]
+          salinity_data = self.hycom_model.variables['salinity'][closest_start_ndx:closest_end_ndx+1,0,self.hycom_latli:self.hycom_latui,self.hycom_lonli:self.hycom_lonui]
           pt = closestCellFromPtInPolygon(self.site.object_geometry,
                                           self.hycom_lon_array, self.hycom_lat_array,
                                           salinity_data[0],
                                           self.hycom_model.variables['salinity']._FillValue,
                                           self.model_within_polygon)
-          #Get the salinity data
-          avg_salinity_pts = salinity_data[0:closest_end_ndx-closest_start_ndx,pt.y,pt.x]
-          wq_tests_data['hycom_avg_salinity_24'] = np.average(avg_salinity_pts)
-          wq_tests_data['hycom_min_salinity'] = avg_salinity_pts.min()
-          wq_tests_data['hycom_max_salinity'] = avg_salinity_pts.max()
+          #closest_end_ndx and closest_start_ndx are calculated from the full data set.
+          #When we slice the piece we're interested in above, that dataset becomes 0
+          #referenced, so when accessing salinity_data, our indexes need to reflect that.
+          #salinity_192 = salinity_data[0:closest_end_ndx-closest_start_ndx+1,pt.y,pt.x]
+          #times_192 = self.hycom_model_time[closest_start_ndx:closest_end_ndx+1]
+          """
+          with open("/Users/danramage/tmp/salinity_192_model.csv", "w") as out_file:
+            out_file.write("Date,Salinity\n")
+            for ndx in range(0, len(salinity_192)):
+              out_file.write("%s,%f\n" %\
+                             ((beginning_time + timedelta(days=times_192[ndx])).strftime("%Y-%m-%dT%H:%M:%S"),
+                             salinity_192[ndx]))
+          """
+          adjusted_end_ndx = None
+          for hour in range(24, 192, 24):
+            #Calculate the date we will start at referenced to the beginning_time of the data.
+            begin_delta = (start_date - timedelta(hours=hour)) - beginning_time
+            #Get the days count.
+            begin_days_cnt = (begin_delta.days) + (begin_delta.seconds / (60.0 * 60.0 * 24.0))
+            #Find the index in the data our days count is closest to.
+            begin_ndx = bisect_left(self.hycom_model_time, begin_days_cnt)
+            #Offset indexes from the larger dataset to our subset.
+            adjusted_begin_ndx = begin_ndx-closest_start_ndx
+            if adjusted_end_ndx is None:
+              adjusted_end_ndx = closest_end_ndx-closest_start_ndx
+            #Validate we're getting the same dates.
+            #if self.hycom_model_time[begin_ndx] != times_192[adjusted_begin_ndx]:
+            #  if self.logger:
+            #    self.logger.error("Times do not match")
+            #Get the last 24 hour average salinity data
+            avg_salinity_pts = salinity_data[adjusted_begin_ndx:adjusted_end_ndx,pt.y,pt.x]
 
+            wq_tests_data['hycom_avg_salinity_%d' % (hour)] = np.average(avg_salinity_pts)
+            wq_tests_data['hycom_min_salinity_%d' % (hour)] = avg_salinity_pts.min()
+            wq_tests_data['hycom_max_salinity_%d' % (hour)] = avg_salinity_pts.max()
+
+            adjusted_end_ndx = adjusted_begin_ndx
+
+          #Calc indexes for the last 24 hour average.
+          """
+          last_24_delta = (start_date - timedelta(hours=24)) - beginning_time
+          last_24_start = (last_24_delta.days) + (last_24_delta.seconds / (60.0 * 60.0 * 24.0))
+          last_24_ndx = bisect_left(self.hycom_model_time, last_24_start)
+          #Offset indexes from the larger dataset to our subset.
+          start_ndx_24 = last_24_ndx-closest_start_ndx
+          end_ndx_24 = closest_end_ndx-closest_start_ndx
+
+          #Get the last 24 hour average salinity data
+          avg_salinity_pts = salinity_data[start_ndx_24:end_ndx_24,pt.y,pt.x]
+          """
+          #times_24 = self.hycom_model_time[last_24_ndx:closest_end_ndx]
+          """
+          with open("/Users/danramage/tmp/salinity_24_model.csv", "w") as out_file:
+            out_file.write("Date,Salinity\n")
+            for ndx in range(0, len(avg_salinity_pts)):
+              out_file.write("%s,%f\n" %\
+                             ((beginning_time + timedelta(days=times_24[ndx])).strftime("%Y-%m-%dT%H:%M:%S"),
+                             avg_salinity_pts[ndx]))
+          """
+          #wq_tests_data['hycom_avg_salinity_24'] = np.average(avg_salinity_pts)
+          #wq_tests_data['hycom_min_salinity'] = avg_salinity_pts.min()
+          #wq_tests_data['hycom_max_salinity'] = avg_salinity_pts.max()
+
+          """
+          #Now get the rate of change from 24-192 hours back
+          ndx_list = []
+          for time_ndx in range(24, 192, 24):
+            date_ndx = start_date - timedelta(hours=time_ndx)
+            time_delta = date_ndx - beginning_time
+            #The time dimension in the model is hours offset since the beginning_time above.
+            #offset_hours = (time_delta.days * 24) + (time_delta.seconds / (60 * 60 * 24))
+            offset_ndx = (time_delta.days) + (time_delta.seconds / (60.0 * 60.0 * 24.0))
+            ndx_list.append(bisect_left(self.hycom_model_time, offset_ndx))
+          """
           if self.logger:
             self.logger.debug("Retrieving hycom water temp data.")
-          water_temp_data = self.hycom_model.variables['temperature'][closest_start_ndx:closest_end_ndx,0,self.hycom_latli:self.hycom_latui,self.hycom_lonli:self.hycom_lonui]
-          avg_water_temp_pts = water_temp_data[0:closest_end_ndx-closest_start_ndx,pt.y,pt.x]
+
+          last_24_delta = (start_date - timedelta(hours=24)) - beginning_time
+          last_24_start = (last_24_delta.days) + (last_24_delta.seconds / (60.0 * 60.0 * 24.0))
+          last_24_ndx = bisect_left(self.hycom_model_time, last_24_start)
+
+          water_temp_data = self.hycom_model.variables['temperature'][last_24_ndx:closest_end_ndx,0,self.hycom_latli:self.hycom_latui,self.hycom_lonli:self.hycom_lonui]
+          avg_water_temp_pts = water_temp_data[0:last_24_ndx-closest_start_ndx,pt.y,pt.x]
           #Get the water temperature data
           wq_tests_data['hycom_avg_water_temp_24'] = np.average(avg_water_temp_pts)
           wq_tests_data['hycom_min_water_temp'] = avg_water_temp_pts.min()
@@ -364,7 +454,7 @@ class florida_wq_data(wq_data):
             cell_lon = self.hycom_lon_array[pt.x]
             begin_dt = beginning_time + timedelta(days=(self.hycom_model_time[closest_start_ndx]))
             end_dt = beginning_time + timedelta(days=(self.hycom_model_time[closest_end_ndx]))
-            self.logger.debug("Site: %s Dates: %s to %s closest cell@ Lat: %f(%d) Lon: %f(%d) Salinity Avg: %f Water Temp Avg: %f"\
+            self.logger.debug("Site: %s Dates: %s to %s closest cell@ Lat: %f(%d) Lon: %f(%d) Salinity 24 hrAvg: %f Water Temp Avg: %f"\
                               % (self.site.name,\
                                  begin_dt.strftime('%Y-%m-%dT%H:%M:%S'), end_dt.strftime('%Y-%m-%dT%H:%M:%S'),\
                                  cell_lat, pt.x, cell_lon, pt.y,\
@@ -396,20 +486,24 @@ class florida_wq_data(wq_data):
       date_key = start_date.strftime('%Y-%m-%dT%H:%M:%S')
       if date_key in self.tide_data_obj:
         tide_rec = self.tide_data_obj[date_key]
-        wq_tests_data['%s_tide_range' % (self.tide_station)] = tide_rec['range']
-        wq_tests_data['%s_tide_hi' % (self.tide_station)] = tide_rec['hi']
-        wq_tests_data['%s_tide_lo' % (self.tide_station)] = tide_rec['lo']
+        wq_tests_data['tide_range_%s' % (self.tide_station)] = tide_rec['range']
+        wq_tests_data['tide_hi_%s' % (self.tide_station)] = tide_rec['hi']
+        wq_tests_data['tide_lo_%s' % (self.tide_station)] = tide_rec['lo']
       #THe web service is unreliable, so if we were using the history csv file, it may still be missing
       #a record, if so, let's try to look it up on the web.
       else:
         use_web_service = True
     if self.tide_data_obj is None or use_web_service:
+      #Get previous 24 hours.
+      tide_start_time = (start_date - timedelta(hours=24))
+      tide_end_time = start_date
+
       tide = noaaTideData(use_raw=True, logger=self.logger)
       #Date/Time format for the NOAA is YYYYMMDD
 
       try:
-        tide_data = tide.calcTideRange(beginDate = start_date.strftime('%Y%m%d'),
-                           endDate = start_date.strftime('%Y%m%d'),
+        tide_data = tide.calcTideRange(beginDate = tide_start_time,
+                           endDate = tide_end_time,
                            station=self.tide_station,
                            datum='MLLW',
                            units='feet',
@@ -427,22 +521,22 @@ class florida_wq_data(wq_data):
               self.logger.exception(e)
           else:
             #Save tide station values.
-            wq_tests_data['%s_tide_range' % (self.tide_station)] = range
-            wq_tests_data['%s_tide_hi' % (self.tide_station)] = tide_data['HH']['value']
-            wq_tests_data['%s_tide_lo' % (self.tide_station)] = tide_data['LL']['value']
+            wq_tests_data['tide_range_%s' % (self.tide_station)] = range
+            wq_tests_data['tide_hi_%s' % (self.tide_station)] = tide_data['HH']['value']
+            wq_tests_data['tide_lo_%s' % (self.tide_station)] = tide_data['LL']['value']
         else:
           if self.logger:
             self.logger.error("Tide data for station: %s date: %s not available or only partial." % (self.tide_station, start_date))
 
     #Save subordinate station values
-    if wq_tests_data['%s_tide_hi'%(self.tide_station)] != wq_defines.NO_DATA:
-      offset_hi = wq_tests_data['%s_tide_hi'%(self.tide_station)] * self.tide_offset_settings['hi_tide_height_offset']
-      offset_lo = wq_tests_data['%s_tide_lo'%(self.tide_station)] * self.tide_offset_settings['lo_tide_height_offset']
+    if wq_tests_data['tide_hi_%s'%(self.tide_station)] != wq_defines.NO_DATA:
+      offset_hi = wq_tests_data['tide_hi_%s'%(self.tide_station)] * self.tide_offset_settings['hi_tide_height_offset']
+      offset_lo = wq_tests_data['tide_lo_%s'%(self.tide_station)] * self.tide_offset_settings['lo_tide_height_offset']
 
       tide_station = self.tide_offset_settings['tide_station']
-      wq_tests_data['%s_tide_range' % (tide_station)] = offset_hi - offset_lo
-      wq_tests_data['%s_tide_hi' % (tide_station)] = offset_hi
-      wq_tests_data['%s_tide_lo' % (tide_station)] = offset_lo
+      wq_tests_data['tide_range_%s' % (tide_station)] = offset_hi - offset_lo
+      wq_tests_data['tide_hi_%s' % (tide_station)] = offset_hi
+      wq_tests_data['tide_lo_%s' % (tide_station)] = offset_lo
 
     if self.logger:
       self.logger.debug("Finished retrieving tide data for station: %s date: %s" % (self.tide_station, start_date))
@@ -476,12 +570,14 @@ class florida_wq_data(wq_data):
 
     #Collect the radar data for the boundaries.
     for boundary in self.site.contained_by:
+      clean_var_bndry_name = boundary.name.lower().replace(' ', '_')
+
       platform_handle = 'nws.%s.radarcoverage' % (boundary.name)
       if self.logger:
         self.logger.debug("Start retrieving nexrad platfrom: %s" % (platform_handle))
       # Get the radar data for previous 8 days in 24 hour intervals
       for prev_hours in range(24, 192, 24):
-        var_name = '%s_summary_%d' % (boundary.name.lower().replace(' ', '_'), prev_hours)
+        var_name = '%s_nexrad_summary_%d' % (clean_var_bndry_name, prev_hours)
         radar_val = self.xenia_db.getLastNHoursSummaryFromRadarPrecip(platform_handle,
                                                                     start_date,
                                                                     prev_hours,
@@ -492,12 +588,26 @@ class florida_wq_data(wq_data):
         else:
           if self.logger:
             self.logger.error("No data available for boundary: %s Date: %s. Error: %s" %(var_name, start_date, self.xenia_db.getErrorInfo()))
+
+      #calculate the X day delay totals
+      if wq_tests_data['%s_nexrad_summary_48' % (clean_var_bndry_name)] != wq_defines.NO_DATA and\
+         wq_tests_data['%s_nexrad_summary_24' % (clean_var_bndry_name)] != wq_defines.NO_DATA:
+        wq_tests_data['%s_nexrad_total_1_day_delay' % (clean_var_bndry_name)] = wq_tests_data['%s_nexrad_summary_48' % (clean_var_bndry_name)] - wq_tests_data['%s_nexrad_summary_24' % (clean_var_bndry_name)]
+
+      if wq_tests_data['%s_nexrad_summary_72' % (clean_var_bndry_name)] != wq_defines.NO_DATA and\
+         wq_tests_data['%s_nexrad_summary_48' % (clean_var_bndry_name)] != wq_defines.NO_DATA:
+        wq_tests_data['%s_nexrad_total_2_day_delay' % (clean_var_bndry_name)] = wq_tests_data['%s_nexrad_summary_72' % (clean_var_bndry_name)] - wq_tests_data['%s_nexrad_summary_48' % (clean_var_bndry_name)]
+
+      if wq_tests_data['%s_nexrad_summary_96' % (clean_var_bndry_name)] != wq_defines.NO_DATA and\
+         wq_tests_data['%s_nexrad_summary_72' % (clean_var_bndry_name)] != wq_defines.NO_DATA:
+        wq_tests_data['%s_nexrad_total_3_day_delay' % (clean_var_bndry_name)] = wq_tests_data['%s_nexrad_summary_96' % (clean_var_bndry_name)] - wq_tests_data['%s_nexrad_summary_72' % (clean_var_bndry_name)]
+
       prev_dry_days = self.xenia_db.getPrecedingRadarDryDaysCount(platform_handle,
                                              start_date,
                                              'precipitation_radar_weighted_average',
                                              'mm')
       if prev_dry_days is not None:
-        var_name = '%s_dry_days_count' % (boundary.name.lower().replace(' ', '_'))
+        var_name = '%s_nexrad_dry_days_count' % (clean_var_bndry_name)
         wq_tests_data[var_name] = prev_dry_days
 
       rainfall_intensity = self.xenia_db.calcRadarRainfallIntensity(platform_handle,
@@ -506,8 +616,9 @@ class florida_wq_data(wq_data):
                                                               'precipitation_radar_weighted_average',
                                                               'mm')
       if rainfall_intensity is not None:
-        var_name = '%s_rainfall_intesity' % (boundary.name.lower().replace(' ', '_'))
+        var_name = '%s_nexrad_rainfall_intesity' % (clean_var_bndry_name)
         wq_tests_data[var_name] = rainfall_intensity
+
 
       if self.logger:
         self.logger.debug("Finished retrieving nexrad platfrom: %s" % (platform_handle))
@@ -517,13 +628,49 @@ class florida_wq_data(wq_data):
 
 
   def get_c10_data(self, start_date, wq_tests_data):
-    start_epoch_time = int(get_utc_epoch(start_date) + 0.5)
-
     #Find the starting time index to work from.
     if self.logger:
       self.logger.debug("Start thredds C10 search for datetime: %s" % (start_date.strftime('%Y-%m-%d %H:%M:%S')))
 
+    start_epoch_time = int(get_utc_epoch(start_date) + 0.5)
+    end_epoch_time = None
+    for prev_hour in range(24,192,24):
+      start_epoch_time = float(get_utc_epoch(start_date - timedelta(hours=prev_hour)))
+      if end_epoch_time is None:
+        end_epoch_time = float(get_utc_epoch(start_date))
 
+      closest_start_ndx = bisect_left(self.c10_times, start_epoch_time)
+      #For whatever reason, when the value is in the array, bisect keeps returning the index after it.
+      #Convert to int with bankers rounding to overcome floating point issues.
+      if int(start_epoch_time + 0.5) == int(self.c10_times[closest_start_ndx-1] + 0.5):
+        closest_start_ndx -= 1
+      closest_end_ndx = bisect_left(self.c10_times, end_epoch_time)
+      #Check to make sure end index is not past our desired time.
+      if int(end_epoch_time + 0.5) == int(self.c10_times[closest_end_ndx-1] + 0.5):
+      #if self.c10_times[closest_end_ndx] > end_epoch_time:
+        closest_end_ndx -= 1
+      if ((int(self.c10_times[closest_start_ndx] + 0.5) >= int(start_epoch_time + 0.5)) and (int(self.c10_times[closest_start_ndx] + 0.5) < int(end_epoch_time + 0.5))) and\
+         ((int(self.c10_times[closest_end_ndx] + 0.5) > int(start_epoch_time + 0.5)) and (int(self.c10_times[closest_end_ndx] + 0.5) <= int(end_epoch_time + 0.5))):
+
+        c10_salinity = self.c10_salinity[closest_start_ndx:closest_end_ndx]
+        #Only calc average on real values, ignore NaNs.
+        c10_no_nan_salinity = c10_salinity[~np.isnan(c10_salinity)]
+        wq_tests_data['c10_avg_salinity_%d' % (prev_hour)] = np.average(c10_no_nan_salinity)
+        wq_tests_data['c10_min_salinity_%d' % (prev_hour)] = c10_salinity.min()
+        wq_tests_data['c10_max_salinity_%d' % (prev_hour)] = c10_salinity.max()
+        #Only get the 24 hour average of water temp
+        if prev_hour == 24:
+          #Only calc average on real values, ignore NaNs.
+          c10_water_temp = self.c10_water_temp[closest_start_ndx:closest_end_ndx]
+          c10_no_nan_water_temp = c10_water_temp[~np.isnan(c10_water_temp)]
+          wq_tests_data['c10_avg_water_temp_24'] = np.average(c10_no_nan_water_temp)
+          wq_tests_data['c10_min_water_temp_24'] = c10_water_temp.min()
+          wq_tests_data['c10_max_water_temp_24'] = c10_water_temp.max()
+      else:
+        i = 0
+
+      end_epoch_time = start_epoch_time
+    """
     closest_start_time_idx = bisect_left(self.c10_times, start_epoch_time)
     c10_val = int(self.c10_times[closest_start_time_idx-1] + 0.5)
     if start_epoch_time == c10_val:
@@ -590,6 +737,12 @@ class florida_wq_data(wq_data):
                             % (start_date.strftime('%Y-%m-%d %H:%M:%S'), prev_hour_dt.strftime('%Y-%m-%d %H:%M:%S'),
                                str(avg_c10_salinity), str(min_sal), str(max_sal),
                                str(avg_c10_wt), str(min_temp), str(max_temp)))
+    """
+    if self.logger:
+      self.logger.debug("Thredds C10 Start: %s Avg Salinity: %s (%s,%s) Avg Water Temp: %s (%s,%s)"\
+                        % (start_date.strftime('%Y-%m-%d %H:%M:%S'),
+                           str(wq_tests_data['c10_avg_salinity_24']), str(wq_tests_data['c10_min_salinity_24']), str(wq_tests_data['c10_max_salinity_24']),
+                           str(wq_tests_data['c10_avg_water_temp_24']), str(wq_tests_data['c10_min_water_temp']), str(wq_tests_data['c10_max_water_temp'])))
     if self.logger:
       self.logger.debug("Finished thredds C10 search for datetime: %s" % (start_date.strftime('%Y-%m-%d %H:%M:%S')))
 
@@ -885,7 +1038,7 @@ def main():
   parser.add_option("-d", "--StartDate", dest="starting_date",
                     help="Date to use for the retrieval." )
   parser.add_option("-m", "--StartTimeMidnight", dest="start_time_midnight",
-                    action="store_true", default=False,
+                    action="store_true", default=True,
                     help="Set time to 00:00:00 for the queries instead of the sample time." )
   parser.add_option("-t", "--TideDataFile", dest="tide_data_file",
                     help="If used, this is the path to a tide data csv file.", default=None )
