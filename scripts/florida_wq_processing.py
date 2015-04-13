@@ -655,17 +655,19 @@ class florida_wq_data(wq_data):
         c10_salinity = self.c10_salinity[closest_start_ndx:closest_end_ndx]
         #Only calc average on real values, ignore NaNs.
         c10_no_nan_salinity = c10_salinity[~np.isnan(c10_salinity)]
-        wq_tests_data['c10_avg_salinity_%d' % (prev_hour)] = np.average(c10_no_nan_salinity)
-        wq_tests_data['c10_min_salinity_%d' % (prev_hour)] = c10_salinity.min()
-        wq_tests_data['c10_max_salinity_%d' % (prev_hour)] = c10_salinity.max()
+        if len(c10_no_nan_salinity):
+          wq_tests_data['c10_avg_salinity_%d' % (prev_hour)] = np.average(c10_no_nan_salinity)
+          wq_tests_data['c10_min_salinity_%d' % (prev_hour)] = c10_no_nan_salinity.min()
+          wq_tests_data['c10_max_salinity_%d' % (prev_hour)] = c10_no_nan_salinity.max()
         #Only get the 24 hour average of water temp
         if prev_hour == 24:
           #Only calc average on real values, ignore NaNs.
           c10_water_temp = self.c10_water_temp[closest_start_ndx:closest_end_ndx]
           c10_no_nan_water_temp = c10_water_temp[~np.isnan(c10_water_temp)]
-          wq_tests_data['c10_avg_water_temp_24'] = np.average(c10_no_nan_water_temp)
-          wq_tests_data['c10_min_water_temp_24'] = c10_water_temp.min()
-          wq_tests_data['c10_max_water_temp_24'] = c10_water_temp.max()
+          if len(c10_no_nan_water_temp):
+            wq_tests_data['c10_avg_water_temp_24'] = np.average(c10_no_nan_water_temp)
+            wq_tests_data['c10_min_water_temp_24'] = c10_no_nan_water_temp.min()
+            wq_tests_data['c10_max_water_temp_24'] = c10_no_nan_water_temp.max()
       else:
         i = 0
 
