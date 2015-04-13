@@ -666,8 +666,8 @@ class florida_wq_data(wq_data):
           c10_no_nan_water_temp = c10_water_temp[~np.isnan(c10_water_temp)]
           if len(c10_no_nan_water_temp):
             wq_tests_data['c10_avg_water_temp_24'] = np.average(c10_no_nan_water_temp)
-            wq_tests_data['c10_min_water_temp_24'] = c10_no_nan_water_temp.min()
-            wq_tests_data['c10_max_water_temp_24'] = c10_no_nan_water_temp.max()
+            wq_tests_data['c10_min_water_temp'] = c10_no_nan_water_temp.min()
+            wq_tests_data['c10_max_water_temp'] = c10_no_nan_water_temp.max()
       else:
         i = 0
 
