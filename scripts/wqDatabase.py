@@ -49,6 +49,29 @@ class wqDB(dhecDB):
 
     return sum
 
+  def findGaps(self, startDate, endDate, sensorId, allowedGapSecs=7200):
+      hasGap = False
+      sql = "SELECT m_date FROM multi_obs WHERE ( m_date < '%s' AND m_date > '%s') AND sensor_id=%d ORDER BY m_date DESC;"\
+            % (startDate.strftime("%Y-%m-%dT%H:%M:%S"), endDate.strftime("%Y-%m-%dT%H:%M:%S"), sensorId)
+      try:
+        dbCursor = self.DB.cursor()
+        dbCursor.execute(sql)
+      except sqlite3.Error, e:
+        if self.logger:
+          self.logger.exception(e)
+      else:
+        prev_date = None
+        for row in dbCursor:
+          cur_date = datetime.strptime(row['m_date'], "%Y-%m-%dT%H:%M:%S")
+          if prev_date is not None:
+            delta = prev_date - cur_date
+            if delta.seconds > allowedGapSecs:
+              hasGap = True
+              break
+          prev_date = cur_date
+        dbCursor.close()
+
+      return hasGap
   """
   Function: getPrecedingRadarDryDaysCount
   Purpose: For the given date, this function calculates how many days previous had no rainfall, if any.
@@ -67,6 +90,7 @@ class wqDB(dhecDB):
       #We want to start our dry day search the day before our dateTime.
       sql = "SELECT m_date FROM multi_obs WHERE m_date < '%s' AND sensor_id=%d AND m_value > 0 ORDER BY m_date DESC LIMIT 1;"\
             % (dateTime.strftime("%Y-%m-%dT%H:%M:%S"), sensorId)
+
       try:
         dbCursor = self.DB.cursor()
         dbCursor.execute(sql)
@@ -78,10 +102,13 @@ class wqDB(dhecDB):
           row = dbCursor.fetchone()
           if row:
             first_val = datetime.strptime(row['m_date'], "%Y-%m-%dT%H:%M:%S")
-            #Get rid of the time zone.
-            start_date = datetime.strptime(dateTime.strftime("%Y-%m-%dT%H:%M:%S"), "%Y-%m-%dT%H:%M:%S")
-            delta = start_date - first_val
-            dry_cnt = delta.days
+            #Now let's check and make sure we're not missing data in between out date of interest
+            #and the first date we have with rainfall.
+            if not self.findGaps(dateTime, first_val, sensorId):
+              #Get rid of the time zone.
+              start_date = datetime.strptime(dateTime.strftime("%Y-%m-%dT%H:%M:%S"), "%Y-%m-%dT%H:%M:%S")
+              delta = start_date - first_val
+              dry_cnt = delta.days
     else:
       if self.logger:
         self.logger.error("No sensor id found for platform: %s." % (platform_handle))
