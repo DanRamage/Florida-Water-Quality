@@ -71,7 +71,7 @@ class wqDB(dhecDB):
               break
           prev_date = cur_date
           rec_cnt += 1
-        if rec_cnt == 0:
+        if rec_cnt <= 1:
           hasGap = True
         dbCursor.close()
 
