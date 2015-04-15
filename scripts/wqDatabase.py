@@ -109,6 +109,10 @@ class wqDB(dhecDB):
               start_date = datetime.strptime(dateTime.strftime("%Y-%m-%dT%H:%M:%S"), "%Y-%m-%dT%H:%M:%S")
               delta = start_date - first_val
               dry_cnt = delta.days
+            else:
+              if self.logger:
+                self.logger.debug("NEXRAD data gap found between: %s - %s" %\
+                                    (dateTime.strftime("%Y-%m-%dT%H:%M:%S"), row['m_date']))
     else:
       if self.logger:
         self.logger.error("No sensor id found for platform: %s." % (platform_handle))
