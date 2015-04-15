@@ -61,6 +61,7 @@ class wqDB(dhecDB):
           self.logger.exception(e)
       else:
         prev_date = None
+        rec_cnt = 0
         for row in dbCursor:
           cur_date = datetime.strptime(row['m_date'], "%Y-%m-%dT%H:%M:%S")
           if prev_date is not None:
@@ -69,6 +70,9 @@ class wqDB(dhecDB):
               hasGap = True
               break
           prev_date = cur_date
+          rec_cnt += 1
+        if rec_cnt == 0:
+          hasGap = True
         dbCursor.close()
 
       return hasGap
@@ -83,7 +87,8 @@ class wqDB(dhecDB):
     rainGauge is the rain  gauge we are query the rainfall summary for.
   """
   def getPrecedingRadarDryDaysCount(self, platform_handle, dateTime, obs_type, uom):
-
+    if dateTime.year == 2003:
+      i = 0
     dry_cnt = -9999
     sensorId = dhecDB.sensorExists(self, obs_type, uom, platform_handle)
     if sensorId != None and sensorId != -1:
