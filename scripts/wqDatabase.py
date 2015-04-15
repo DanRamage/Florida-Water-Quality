@@ -197,8 +197,8 @@ class wqDB(dhecDB):
       rainfallIntensity = self.calcIntensity( platform_handle, sensor_id, date, intervalInMinutes)
       #We do not store radar data that has 0 for precipitation, so we want to make sure not to send
       #-1.0 as the return value as -1.0 indicates no data due to a data problem.
-      if rainfallIntensity == -9999.0:
-        rainfallIntensity = 0.0
+      #if rainfallIntensity == -9999.0:
+      #  rainfallIntensity = 0.0
     else:
       self.logger.error("No sensor for: precipitation_radar_weighted_average(in) found for platform: %s" %(platform_handle))
     return rainfallIntensity
