@@ -146,7 +146,7 @@ class vectorMagDir(object):
     angle = math.atan2(y,x)
     #return(magnitude,angle)
     if(positiveDegrees):
-      angle = 180/math.pi * angle;
+      angle = 180/math.pi * angle
       angle = 90 - angle;
       #only return positive degrees
       if (angle < 0):
@@ -154,8 +154,8 @@ class vectorMagDir(object):
     return(magnitude,angle)
 
   def calcVector(self, speed, direction):
-    eastComp = speed * math.sin( math.radians(direction) );
-    northComp = speed * math.cos( math.radians(direction) );  
+    eastComp = speed * math.sin( math.radians(direction) )
+    northComp = speed * math.cos( math.radians(direction) )
     
     return(eastComp,northComp)
             
