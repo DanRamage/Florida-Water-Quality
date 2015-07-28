@@ -8,8 +8,8 @@ def main():
   #http://cdo.ncdc.noaa.gov/qclcd/QCLCD?VARVALUE=12871200501&prior=N&qcname=VER2&reqday=E&reqday=&stnid=n%2Fa&which=ASCII%20Download%20(Hourly%20Obs.)%20(10A)
   base_url = 'http://cdo.ncdc.noaa.gov/qclcd/QCLCD?'
   dest_dir = '/Users/danramage/Documents/workspace/WaterQuality/Florida_Water_Quality/data/in-situ/nws-ksrq/months/'
-  start_date = datetime.strptime('2005-01-01', '%Y-%m-%d')
-  end_date = datetime.strptime('2015-01-01', '%Y-%m-%d')
+  start_date = datetime.strptime('2015-01-01', '%Y-%m-%d')
+  end_date = datetime.strptime('2015-07-01', '%Y-%m-%d')
   next_month = start_date
   start_month = 1
   start_year = 2005
