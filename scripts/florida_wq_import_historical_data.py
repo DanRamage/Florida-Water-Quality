@@ -116,7 +116,8 @@ def import_nws_data(nws_directory, xenia_db_name):
       line_cnt = 0
 
       try:
-        full_path = "%s%s" % (nws_directory, nws_file_name)
+        #full_path = "%s%s" % (nws_directory, nws_file_name)
+        full_path = os.path.join(nws_directory, nws_file_name)
         if logger:
           logger.debug("Opening NWS File: %s" % (full_path))
 
