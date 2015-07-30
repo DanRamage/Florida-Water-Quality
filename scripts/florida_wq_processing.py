@@ -58,8 +58,15 @@ class florida_wq_data(wq_data):
     #only once and retrieve the times.
     self.ncObj = nc.Dataset(kwargs['c_10_tds_url'])
     self.c10_times = self.ncObj.variables['time'][:]
-    self.c10_water_temp = self.ncObj.variables['temperature_04'][:]
-    self.c10_salinity = self.ncObj.variables['salinity_04'][:]
+
+    #Salinity before 2012-11-01 23:00:00
+    self.c10_time_break = timezone('UTC').localize(datetime.strptime('2012-11-01 23:00:00', '%Y-%m-%d %H:%M:%S'))
+    self.c10_water_temp_04 = self.ncObj.variables['temperature_04'][:]
+    self.c10_salinity_04 = self.ncObj.variables['salinity_04'][:]
+
+    #Salinity aftter 2012-11-01 23:00:00
+    self.c10_water_temp_01 = self.ncObj.variables['temperature_01'][:]
+    self.c10_salinity_01 = self.ncObj.variables['salinity_01'][:]
 
     self.model_bbox = kwargs['model_bbox']
     self.model_within_polygon = Polygon(kwargs['model_within_polygon'])
@@ -642,17 +649,28 @@ class florida_wq_data(wq_data):
       closest_start_ndx = bisect_left(self.c10_times, start_epoch_time)
       #For whatever reason, when the value is in the array, bisect keeps returning the index after it.
       #Convert to int with bankers rounding to overcome floating point issues.
-      if int(start_epoch_time + 0.5) == int(self.c10_times[closest_start_ndx-1] + 0.5):
+      #I suspect the issue is floating point precision, but not 100% sure.
+      if np.int64(start_epoch_time + 0.5) == np.int64(self.c10_times[closest_start_ndx-1] + np.float64(0.5)):
         closest_start_ndx -= 1
       closest_end_ndx = bisect_left(self.c10_times, end_epoch_time)
       #Check to make sure end index is not past our desired time.
-      if int(end_epoch_time + 0.5) == int(self.c10_times[closest_end_ndx-1] + 0.5):
-      #if self.c10_times[closest_end_ndx] > end_epoch_time:
+      if np.int64(end_epoch_time + 0.5) == np.int64(self.c10_times[closest_end_ndx-1] + np.float64(0.5)):
         closest_end_ndx -= 1
-      if ((int(self.c10_times[closest_start_ndx] + 0.5) >= int(start_epoch_time + 0.5)) and (int(self.c10_times[closest_start_ndx] + 0.5) < int(end_epoch_time + 0.5))) and\
-         ((int(self.c10_times[closest_end_ndx] + 0.5) > int(start_epoch_time + 0.5)) and (int(self.c10_times[closest_end_ndx] + 0.5) <= int(end_epoch_time + 0.5))):
 
-        c10_salinity = self.c10_salinity[closest_start_ndx:closest_end_ndx]
+      if self.logger:
+        start_time = timezone('US/Eastern').localize(datetime.fromtimestamp(np.int64(self.c10_times[closest_start_ndx] + 0.5))).astimezone(timezone('UTC'))
+        end_time = timezone('US/Eastern').localize(datetime.fromtimestamp(np.int64(self.c10_times[closest_end_ndx] + 0.5))).astimezone(timezone('UTC'))
+        self.logger.debug("Thredds C10 Data Start Time: %s Ndx: %d End Time: %s Ndx: %d"\
+          % (start_time.strftime('%Y-%m-%dT%H:%M:%S %Z'), closest_start_ndx, end_time.strftime('%Y-%m-%dT%H:%M:%S %Z'), closest_end_ndx))
+
+      if ((np.int64(self.c10_times[closest_start_ndx] + 0.5) >= np.int64(start_epoch_time + 0.5)) and (np.int64(self.c10_times[closest_start_ndx] + 0.5) < np.int64(end_epoch_time + 0.5))) and\
+         ((np.int64(self.c10_times[closest_end_ndx] + 0.5) > np.int64(start_epoch_time + 0.5)) and (np.int64(self.c10_times[closest_end_ndx] + 0.5) <= np.int64(end_epoch_time + 0.5))):
+
+        if start_date <= self.c10_time_break:
+          c10_salinity = self.c10_salinity_04[closest_start_ndx:closest_end_ndx]
+        else:
+          c10_salinity = self.c10_salinity_01[closest_start_ndx:closest_end_ndx]
+
         #Only calc average on real values, ignore NaNs.
         c10_no_nan_salinity = c10_salinity[~np.isnan(c10_salinity)]
         if len(c10_no_nan_salinity):
@@ -662,84 +680,19 @@ class florida_wq_data(wq_data):
         #Only get the 24 hour average of water temp
         if prev_hour == 24:
           #Only calc average on real values, ignore NaNs.
-          c10_water_temp = self.c10_water_temp[closest_start_ndx:closest_end_ndx]
+          if start_date <= self.c10_time_break:
+            c10_water_temp = self.c10_water_temp_04[closest_start_ndx:closest_end_ndx]
+          else:
+            c10_water_temp = self.c10_water_temp_01[closest_start_ndx:closest_end_ndx]
+
           c10_no_nan_water_temp = c10_water_temp[~np.isnan(c10_water_temp)]
           if len(c10_no_nan_water_temp):
             wq_tests_data['c10_avg_water_temp_24'] = np.average(c10_no_nan_water_temp)
             wq_tests_data['c10_min_water_temp'] = c10_no_nan_water_temp.min()
             wq_tests_data['c10_max_water_temp'] = c10_no_nan_water_temp.max()
-      else:
-        i = 0
 
       end_epoch_time = start_epoch_time
-    """
-    closest_start_time_idx = bisect_left(self.c10_times, start_epoch_time)
-    c10_val = int(self.c10_times[closest_start_time_idx-1] + 0.5)
-    if start_epoch_time == c10_val:
-      closest_start_time_idx -= 1
 
-    if (closest_start_time_idx != 0 and closest_start_time_idx != len(self.c10_times)) \
-      and (closest_start_time_idx != len(self.c10_times)):
-
-      closest_datetime = datetime.fromtimestamp(self.c10_times[closest_start_time_idx], timezone('UTC'))
-      prev_hour_dt = closest_datetime - timedelta(hours=24)
-      prev_hour_epoch = int(get_utc_epoch(prev_hour_dt) + 0.5)
-      #Get closest index for date/time for our prev_hour interval.
-      closest_prev_hour_time_idx = bisect_left(self.c10_times, prev_hour_epoch)
-
-      if self.logger:
-        self.logger.debug("Thredds C10 closest Starting datetime: %s Ending Datetime: %s"\
-                          % (closest_datetime.strftime('%Y-%m-%d %H:%M:%S'),
-                             datetime.fromtimestamp(self.c10_times[closest_prev_hour_time_idx], timezone('UTC')).strftime('%Y-%m-%d %H:%M:%S')))
-      #for prev_hours in range(24, 24, 24):
-
-      rec_cnt = closest_start_time_idx-closest_prev_hour_time_idx
-      if rec_cnt > 24 or rec_cnt < 12:
-        if self.logger:
-          self.logger.error("Thredds record counts are suspect: %d" % (rec_cnt))
-      avg_c10_salinity = 0
-      sal_rec_cnt = 0
-      min_sal = None
-      max_sal = None
-      avg_c10_wt = 0
-      temp_rec_cnt = 0
-      min_temp = None
-      max_temp = None
-      for ndx in range(closest_prev_hour_time_idx, closest_start_time_idx):
-        if not isnan(self.c10_salinity[ndx]):
-          avg_c10_salinity += self.c10_salinity[ndx]
-          if min_sal is None or min_sal > self.c10_salinity[ndx]:
-            min_sal = self.c10_salinity[ndx]
-          if max_sal is None or max_sal < self.c10_salinity[ndx]:
-            max_sal = self.c10_salinity[ndx]
-          sal_rec_cnt += 1
-        if not isnan(self.c10_water_temp[ndx]):
-          avg_c10_wt += self.c10_water_temp[ndx]
-          if min_temp is None or min_temp > self.c10_water_temp[ndx]:
-            min_temp = self.c10_water_temp[ndx]
-          if max_sal is None or max_temp < self.c10_water_temp[ndx]:
-            max_temp = self.c10_water_temp[ndx]
-          temp_rec_cnt += 1
-      if sal_rec_cnt > 0:
-        avg_c10_salinity = avg_c10_salinity / sal_rec_cnt
-        wq_tests_data['c10_avg_salinity_24'] = avg_c10_salinity
-        #wq_tests_data['c10_salinity_rec_cnt'] = sal_rec_cnt
-        wq_tests_data['c10_min_salinity'] = min_sal
-        wq_tests_data['c10_max_salinity'] = max_sal
-
-      if temp_rec_cnt > 0:
-        avg_c10_wt = avg_c10_wt / temp_rec_cnt
-        wq_tests_data['c10_avg_water_temp_24'] = avg_c10_wt
-        #wq_tests_data['c10_water_temp_rec_cnt'] = temp_rec_cnt
-        wq_tests_data['c10_min_water_temp'] = min_temp
-        wq_tests_data['c10_max_water_temp'] = max_temp
-
-        if self.logger:
-          self.logger.debug("Thredds C10 Start: %s End: %s Avg Salinity: %s (%s,%s) Avg Water Temp: %s (%s,%s)"\
-                            % (start_date.strftime('%Y-%m-%d %H:%M:%S'), prev_hour_dt.strftime('%Y-%m-%d %H:%M:%S'),
-                               str(avg_c10_salinity), str(min_sal), str(max_sal),
-                               str(avg_c10_wt), str(min_temp), str(max_temp)))
-    """
     if self.logger:
       self.logger.debug("Thredds C10 Start: %s Avg Salinity: %s (%s,%s) Avg Water Temp: %s (%s,%s)"\
                         % (start_date.strftime('%Y-%m-%d %H:%M:%S'),
