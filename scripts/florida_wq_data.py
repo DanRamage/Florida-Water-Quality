@@ -1,20 +1,28 @@
 import sys
 sys.path.append('../commonfiles')
 
+import logging.config
+
 from datetime import datetime, timedelta
 from pytz import timezone
 from shapely.geometry import Polygon
+import logging.config
 
 import netCDF4 as nc
 import numpy as np
 from bisect import bisect_left
+import csv
 
 from wqHistoricalData import wq_data
 from wqXMRGProcessing import wqDB
 from wqHistoricalData import station_geometry,sampling_sites, wq_defines, geometry_list
 from date_time_utils import get_utc_epoch
 from NOAATideData import noaaTideData
+from xeniaSQLAlchemy import xeniaAlchemy, multi_obs
+from stats import calcAvgSpeedAndDir
 
+
+meters_per_second_to_mph = 2.23694
 """
 florida_sample_sites
 Overrides the default sampling_sites object so we can load the sites from the florida data.
@@ -78,7 +86,7 @@ class florida_sample_sites(sampling_sites):
 florida_wq_data
 Class is responsible for retrieving the data used for the sample sites models.
 """
-class florida_wq_data(wq_data):
+class florida_wq_historical_data(wq_data):
   """
   Function: __init__
   Purpose: Initializes the class.
@@ -182,7 +190,7 @@ class florida_wq_data(wq_data):
     self.initialize_return_data(wq_tests_data)
 
     self.get_nws_data(start_date, wq_tests_data)
-    self.get_c10_data(start_date, wq_tests_data)
+    #self.get_c10_data(start_date, wq_tests_data)
     self.get_nexrad_data(start_date, wq_tests_data)
     self.get_tide_data(start_date, wq_tests_data)
     self.get_hycom_model_data(start_date, wq_tests_data)
@@ -715,5 +723,103 @@ class florida_wq_data(wq_data):
                            str(wq_tests_data['c10_avg_water_temp_24']), str(wq_tests_data['c10_min_water_temp']), str(wq_tests_data['c10_max_water_temp'])))
     if self.logger:
       self.logger.debug("Finished thredds C10 search for datetime: %s" % (start_date.strftime('%Y-%m-%d %H:%M:%S')))
+
+    return
+
+
+class florida_wq_model_data(florida_wq_historical_data):
+  def __init__(self, **kwargs):
+    florida_wq_historical_data.__init__(self, **kwargs)
+    try:
+      #Connect to the xenia database we use for observations aggregation.
+      self.xenia_obs_db = xeniaAlchemy()
+      if self.xenia_obs_db.connectDB(kwargs['xenia_obs_db_type'], kwargs['xenia_obs_db_user'], kwargs['xenia_obs_db_password'], kwargs['xenia_obs_db_host'], kwargs['xenia_obs_db_name'], False):
+        if self.logger:
+          self.logger.info("Succesfully connect to DB: %s at %s" %(kwargs['xenia_obs_db_name'],kwargs['xenia_obs_db_host']))
+      else:
+        self.logger.error("Unable to connect to DB: %s at %s." %(kwargs['xenia_obs_db_name'],kwargs['xenia_obs_db_host']))
+
+
+    except Exception,e:
+      if self.logger:
+        self.logger.exception(e)
+      raise
+
+  def __del__(self):
+    florida_wq_historical_data.__del__(self)
+    if self.logger:
+      self.logger.debug("Disconnecting xenia obs database.")
+    self.xenia_obs_db.disconnect()
+
+
+  def get_nws_data(self, start_date, wq_tests_data):
+    platform_handle = 'nws.KSRQ.metar'
+
+    if self.logger:
+      self.logger.debug("Start retrieving nws platform: %s datetime: %s" % (platform_handle, start_date.strftime('%Y-%m-%d %H:%M:%S')))
+
+    #Get the sensor id for wind speed and wind direction
+    wind_spd_sensor_id = self.xenia_obs_db.sensorExists('wind_speed', 'm_s-1', platform_handle, 1)
+    wind_dir_sensor_id = self.xenia_obs_db.sensorExists('wind_from_direction', 'degrees_true', platform_handle, 1)
+
+    end_date = start_date
+    begin_date = start_date - timedelta(hours=24)
+    try:
+      wind_speed_data = self.xenia_obs_db.session.query(multi_obs)\
+        .filter(multi_obs.platform_handle.ilike(platform_handle))\
+        .filter(multi_obs.sensor_id == wind_spd_sensor_id)\
+        .filter(multi_obs.m_date >= begin_date)\
+        .filter(multi_obs.m_date < end_date)\
+        .order_by(multi_obs.m_date)
+
+      wind_dir_data = self.xenia_obs_db.session.query(multi_obs)\
+        .filter(multi_obs.platform_handle.ilike(platform_handle))\
+        .filter(multi_obs.sensor_id == wind_dir_sensor_id)\
+        .filter(multi_obs.m_date >= begin_date)\
+        .filter(multi_obs.m_date < end_date)\
+        .order_by(multi_obs.m_date)
+    except Exception, e:
+      if self.logger:
+        self.logger.exception(e)
+    else:
+      wind_dir_tuples = []
+      direction_tuples = []
+      scalar_speed_avg = None
+      speed_count = 0
+      for wind_speed_row in wind_speed_data:
+        for wind_dir_row in wind_dir_data:
+          if wind_speed_row.m_date == wind_dir_row.m_date:
+            if self.logger:
+              self.logger.debug("Building tuple for Speed(%s): %f Dir(%s): %f" % (wind_speed_row.m_date, wind_speed_row.m_value, wind_dir_row.m_date, wind_dir_row.m_value))
+            if scalar_speed_avg is None:
+              scalar_speed_avg = 0
+            scalar_speed_avg += wind_speed_row.m_value
+            speed_count += 1
+            #Vector using both speed and direction.
+            wind_dir_tuples.append((wind_speed_row.m_value, wind_dir_row.m_value))
+            #Vector with speed as constant(1), and direction.
+            direction_tuples.append((1, wind_dir_row.m_value))
+            break
+
+      avg_speed_dir_components = calcAvgSpeedAndDir(wind_dir_tuples)
+      if self.logger:
+        self.logger.debug("Platform: %s Avg Wind Speed: %f(m_s-1) %f(mph) Direction: %f" % (platform_handle,
+                                                                                          avg_speed_dir_components[0],
+                                                                                          avg_speed_dir_components[0] * meters_per_second_to_mph,
+                                                                                          avg_speed_dir_components[1]))
+
+      #Unity components, just direction with speeds all 1.
+      avg_dir_components = calcAvgSpeedAndDir(direction_tuples)
+      scalar_speed_avg = scalar_speed_avg / speed_count
+      wq_tests_data['nws_ksrq_avg_wspd'] = scalar_speed_avg * meters_per_second_to_mph
+      wq_tests_data['nws_ksrq_avg_wdir'] = avg_dir_components[1]
+      if self.logger:
+        self.logger.debug("Platform: %s Avg Scalar Wind Speed: %f(m_s-1) %f(mph) Direction: %f" % (platform_handle,
+                                                                                                 scalar_speed_avg,
+                                                                                                 scalar_speed_avg * meters_per_second_to_mph,
+                                                                                                 avg_dir_components[1]))
+
+    if self.logger:
+      self.logger.debug("Finished retrieving nws platform: %s datetime: %s" % (platform_handle, start_date.strftime('%Y-%m-%d %H:%M:%S')))
 
     return
