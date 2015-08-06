@@ -158,4 +158,22 @@ class vectorMagDir(object):
     northComp = speed * math.cos( math.radians(direction) )
     
     return(eastComp,northComp)
-            
+
+
+def calcAvgSpeedAndDir(speed_dir_tuples):
+  spdAvg = None
+  dirAvg = None
+  vectObj = vectorMagDir()
+
+  #Take the tuples for speed and direction and get the vector components
+  speed_dir_components = [vectObj.calcVector(u_v[0], u_v[1]) for u_v in speed_dir_tuples]
+
+  #If we have speed and direction vectors, calc the averages.
+  if len(speed_dir_components):
+    east_avg = sum(v[0] for v in speed_dir_components) / float(len(speed_dir_components))
+    north_avg = sum(v[1] for v in speed_dir_components) / float(len(speed_dir_components))
+    #Calculate average with speed and direction components.
+    spdAvg,dirAvg = vectObj.calcMagAndDir(east_avg, north_avg)
+
+  return (spdAvg,dirAvg)
+
