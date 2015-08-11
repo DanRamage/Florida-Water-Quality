@@ -740,8 +740,6 @@ class wqXMRGProcessing(processXMRGData):
 
   def process_result(self, xmrg_results):
     try:
-      addSensor = True
-
       if self.writePrecipToKML and xmrg_results.get_boundary_grid('complete_area') is not None:
         if self.writePrecipToKML:
           self.write_boundary_grid_kml('complete_area', xmrg_results.datetime, xmrg_results.get_boundary_grid('complete_area'))
@@ -819,6 +817,35 @@ class wqXMRGProcessing(processXMRGData):
 
   def save_data(self):
     return
+  def download_file_list(self, file_list):
+    files_downloaded = []
+    for file_name in file_list:
+      remote_filename_url = os.path.join(self.baseURL, file_name)
+      if self.logger:
+        self.logger.debug("Downloading file: %s" % (remote_filename_url))
+      try:
+        r = requests.get(remote_filename_url, stream=True)
+      except (requests.HTTPError, requests.ConnectionError) as e:
+        if self.logger:
+          self.logger.exception(e)
+      else:
+        if r.status_code == 200:
+          dest_file = os.path.join(self.xmrgDLDir, file_name)
+          if self.logger:
+            self.logger.debug("Saving to file: %s" % (dest_file))
+          try:
+            with open(dest_file, 'wb') as xmrg_file:
+              for chunk in r:
+                xmrg_file.write(chunk)
+          except IOError,e:
+            if self.logger:
+              self.logger.exception(e)
+          files_downloaded.append(dest_file)
+        else:
+          if self.logger:
+            self.logger.error("Unable to download file: %s" % (remote_filename_url))
+
+    return files_downloaded
 
   def download_range(self, start_date, hour_count):
     files_downloaded = []
@@ -830,33 +857,10 @@ class wqXMRGProcessing(processXMRGData):
       if self.logger:
         self.logger.exception(e)
     else:
-      for file_name in file_list:
-        remote_filename_url = os.path.join(self.baseURL, file_name)
-        if self.logger:
-          self.logger.debug("Downloading file: %s" % (remote_filename_url))
-        try:
-          r = requests.get(remote_filename_url, stream=True)
-        except (requests.HTTPError, requests.ConnectionError) as e:
-          if self.logger:
-            self.logger.exception(e)
-        else:
-          if r.status_code == 200:
-            dest_file = os.path.join(self.xmrgDLDir, file_name)
-            if self.logger:
-              self.logger.debug("Saving to file: %s" % (dest_file))
-            try:
-              with open(dest_file, 'wb') as xmrg_file:
-                for chunk in r:
-                  xmrg_file.write(chunk)
-            except IOError,e:
-              if self.logger:
-                self.logger.exception(e)
-            files_downloaded.append(dest_file)
-          else:
-            if self.logger:
-              self.logger.error("Unable to download file: %s" % (remote_filename_url))
+      files_downloaded = self.download_file_list(file_list)
     if self.logger:
       self.logger.debug("Finished download_range")
+
     return files_downloaded
   """
   Function: file_list_from_date_range
@@ -873,11 +877,66 @@ class wqXMRGProcessing(processXMRGData):
     for x in range(hour_count):
       hr = x + 1
       date_time = start_date_time - timedelta(hours=hr)
-      file_name = date_time.strftime('xmrg%m%d%Y%Hz.gz')
+      file_name = self.build_filename(date_time)
 
       file_list.append(file_name)
 
     return file_list
+
+  def build_filename(self, date_time):
+      return date_time.strftime('xmrg%m%d%Y%Hz.gz')
+
+  def fill_gaps(self, start_date_time, hour_count):
+    if self.logger:
+      self.logger.debug("Starting fill_gaps for start time: %s Previous Hours: %d" % (start_date_time, hour_count))
+    time_list = []
+    #Build list of times that make up the range.
+    for x in range(hour_count):
+      hr = x + 1
+      date_time = start_date_time - timedelta(hours=hr)
+      #time_list.append(date_time.strftime('%Y-%m-%dT%H:%M:%S'))
+      time_list.append(date_time)
+
+    begin_date = start_date_time - timedelta(hours=hour_count)
+    end_date = start_date_time
+    boundary_missing_times = {}
+    for boundary in self.boundaries:
+      platform_handle = 'nws.%s.radarcoverage' % (boundary.name)
+      boundary_missing_times[boundary.name] = time_list[:]
+      try:
+        sql = "SELECT m_date FROM multi_obs WHERE m_date >= '%s' AND m_date < '%s' AND platform_handle='%s' ORDER BY m_date"\
+        % (begin_date, end_date, platform_handle)
+        dbCursor = self.xenia_db.DB.cursor()
+        dbCursor.execute( sql )
+        for row in dbCursor:
+          db_datetime = timezone('UTC').localize(datetime.strptime(row['m_date'], '%Y-%m-%dT%H:%M:%S'))
+          if db_datetime in time_list:
+            boundary_missing_times[boundary.name].remove(db_datetime)
+        dbCursor.close()
+      except Exception,e:
+        if self.logger:
+          self.logger.exception(e)
+    #Now build a non duplicate time list.
+    date_time_unions = []
+    for boundary_name in boundary_missing_times:
+      date_time_unions = list(set(date_time_unions) | set(boundary_missing_times[boundary_name]))
+
+    date_time_unions.sort()
+    if self.logger:
+      self.logger.debug("Times missing: %s" % (",".join([dts.strftime("%Y-%m-%dT%H:%M:%S") for dts in date_time_unions])))
+
+    dl_file_list = [self.build_filename(date_time) for date_time in date_time_unions]
+
+    if self.logger:
+      self.logger.debug("Files to D/L: %s" % (str(dl_file_list)))
+
+    files_downloaded = self.download_file_list(dl_file_list)
+
+    self.import_files(files_downloaded)
+    if self.logger:
+      self.logger.debug("Finished fill_gaps for start time: %s Previous Hours: %d" % (start_date_time, hour_count))
+
+    return
   """
   Function: vacuumDB
   Purpose: Frees up unused space in the database.
@@ -909,6 +968,10 @@ def main():
                     help="Directory to import XMRG files from" )
   parser.add_option("-b", "--BackfillNHours", dest="backfill_n_hours", type="int",
                     help="Number of hours of NEXRAD data to download and process." )
+  parser.add_option("-g", "--FillGaps", dest="fill_gaps",  action="store_true", default=False,
+                    help="If set, this will find gaps for the past N hours as defined in the BackfillNHours." )
+  parser.add_option("-s", "--StartDate", dest="start_date", default=None,
+                    help="Options starting date to use for backfill or gap find operations." )
 
   (options, args) = parser.parse_args()
 
@@ -939,6 +1002,9 @@ def main():
     xmrg_proc = wqXMRGProcessing(logger=True)
     xmrg_proc.load_config_settings(config_file = options.config_file)
     if options.import_data is not None:
+      if logger:
+        logger.info("Importing directory: %s" % (options.import_data))
+
       import_dirs = options.import_data.split(",")
 
       for import_dir in import_dirs:
@@ -946,11 +1012,23 @@ def main():
         file_list.sort()
         xmrg_proc.import_files(file_list)
 
-    if options.backfill_n_hours:
+    elif options.fill_gaps:
+      if options.start_date is None:
+        start_date_time = timezone('US/Eastern').localize(datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)).astimezone(timezone('UTC'))
+      if logger:
+        logger.info("Fill gaps Start time: %s Prev Hours: %d" % (start_date_time, options.backfill_n_hours))
+
+      xmrg_proc.fill_gaps(start_date_time, options.backfill_n_hours)
+
+    elif options.backfill_n_hours:
       start_date_time = timezone('US/Eastern').localize(datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)).astimezone(timezone('UTC'))
+      if logger:
+        logger.info("Backfill N Hours Start time: %s Prev Hours: %d" % (start_date_time, options.backfill_n_hours))
       file_list = xmrg_proc.download_range(start_date_time, options.backfill_n_hours)
       xmrg_proc.import_files(file_list)
 
+  if logger:
+    logger.info("Log file closed.")
 
 if __name__ == "__main__":
   main()
