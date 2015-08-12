@@ -33,7 +33,38 @@ class LatLong(object):
   def __init__(self,lat=None,long=None):
     self.latitude = lat
     self.longitude= long
-    
+
+def getCollectionDateFromFilename(fileName):
+  #Parse the filename to get the data time.
+  (directory,filetime) = os.path.split( fileName )
+  (filetime,ext) = os.path.splitext( filetime )
+  #Let's get rid of the xmrg verbage so we have the time remaining.
+  #The format for the time on these files is MMDDYYY sometimes a trailing z or for some historical
+  #files, the format is xmrg_MMDDYYYY_HRz_SE. The SE could be different for different regions, SE is southeast.
+  #24 hour files don't have the z, or an hour
+
+  dateformat = "%m%d%Y%H"
+  #Regexp to see if we have one of the older filename formats like xmrg_MMDDYYYY_HRz_SE
+  fileParts = re.findall("xmrg_\d{8}_\d{1,2}", filetime)
+  if(len(fileParts)):
+    #Now let's manipulate the string to match the dateformat var above.
+    filetime = re.sub("xmrg_", "", fileParts[0])
+    filetime = re.sub("_","", filetime)
+  else:
+    if(filetime.find('24hrxmrg') != -1):
+      dateformat = "%m%d%Y"
+    filetime = filetime.replace('24hrxmrg', '')
+    filetime = filetime.replace('xmrg', '')
+    filetime = filetime.replace('z', '')
+  #Using mktime() and localtime() is a hack. The time package in python doesn't have a way
+  #to convert a struct_time in UTC to epoch secs. So I just use the local time functions to do what
+  #I want instead of brining in the calender package which has the conversion.
+  secs = time.mktime(time.strptime( filetime, dateformat ))
+  #secs -= offset
+  filetime = time.strftime( "%Y-%m-%dT%H:00:00", time.localtime(secs) )
+
+  return(filetime)
+
 """
   Class: xmrgFile
   Purpose: This class processes a NOAA XMRG binary file.
