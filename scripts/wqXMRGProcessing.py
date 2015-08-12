@@ -1026,9 +1026,8 @@ def main():
                 starting_file_list = file_list[file_ndx:-1]
                 break
           file_list = starting_file_list[:]
-
-
-        xmrg_proc.import_files(file_list)
+        full_path_file_list = [os.path.join(import_dir, file_name) for file_name in file_list]
+        xmrg_proc.import_files(full_path_file_list)
 
     elif options.fill_gaps:
       if options.start_date is None:
