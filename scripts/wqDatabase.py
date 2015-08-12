@@ -328,3 +328,35 @@ class wqDB(dhecDB):
       if self.logger:
         self.logger("Wind speed or wind direction id is not valid.")
     return (spdAvg, dirAvg), (scalarSpdAvg, vectorDirAvg)
+
+
+  def list_missing_nexrad_dates(self, start_datetime, end_datetime):
+    missing_list = []
+
+    time_delta = end_datetime - start_datetime
+    date_list = []
+    for x in range(time_delta.seconds/3600):
+      hr = x + 1
+      dateTime = end_datetime - datetime.timedelta(hours=hr)
+      date_list.append(dateTime.strftime("%Y-%m-%dT%H:00:00"))
+
+    sql = "SELECT DISTINCT(collection_date) as date FROM precipitation_radar ORDER BY collection_date DESC;"
+    db_cursor = self.DB.cursor()
+    db_cursor.execute(sql)
+    if db_cursor is not None:
+      #Now we'll loop through and pull any date from the database that matches a date in our list
+      #from the list. This gives us our gaps.
+      for row in db_cursor:
+        dbDate = row['date']
+        for x in range(len(date_list)):
+          if dbDate == date_list[x]:
+            date_list.pop(x)
+            break
+      db_cursor.close()
+
+    if self.logger != None:
+      self.logger.debug( "Date/times missing in XMRG database: %s" % (date_list))
+
+
+
+    return missing_list
