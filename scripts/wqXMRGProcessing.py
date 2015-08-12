@@ -905,13 +905,16 @@ class wqXMRGProcessing(processXMRGData):
       boundary_missing_times[boundary.name] = time_list[:]
       try:
         sql = "SELECT m_date FROM multi_obs WHERE m_date >= '%s' AND m_date < '%s' AND platform_handle='%s' ORDER BY m_date"\
-        % (begin_date, end_date, platform_handle)
+        % (begin_date.strftime('%Y-%m-%dT%H:%M:%S'), end_date.strftime('%Y-%m-%dT%H:%M:%S'), platform_handle)
         dbCursor = self.xenia_db.DB.cursor()
         dbCursor.execute( sql )
         for row in dbCursor:
           db_datetime = timezone('UTC').localize(datetime.strptime(row['m_date'], '%Y-%m-%dT%H:%M:%S'))
           if db_datetime in time_list:
             boundary_missing_times[boundary.name].remove(db_datetime)
+
+        if self.logger:
+          self.logger.debug("Boundary: %s needs %d files to fill gap." % (boundary.name, len(boundary_missing_times[boundary.name])))
         dbCursor.close()
       except Exception,e:
         if self.logger:
