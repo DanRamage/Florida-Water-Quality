@@ -20,9 +20,9 @@ from pykml.factory import KML_ElementMaker as KML
 from lxml import etree
 from wqDatabase import wqDB
 
-from processXMRGFile import processXMRGData
+#from processXMRGFile import processXMRGData
 from wqHistoricalData import item_geometry, geometry_list
-from xmrgFile import xmrgFile, hrapCoord, LatLong, nexrad_db
+from xmrgFile import xmrgFile, hrapCoord, LatLong, nexrad_db, getCollectionDateFromFilename
 
 """
 class configSettings(object):
@@ -377,7 +377,7 @@ def process_xmrg_file(**kwargs):
 Want to move away form the XML config file used and use an ini file. Create a new class
 inheritting from the dhec one.
 """
-class wqXMRGProcessing(processXMRGData):
+class wqXMRGProcessing(object):
   def __init__(self, logger=True):
 
     self.logger = None
@@ -1013,6 +1013,21 @@ def main():
       for import_dir in import_dirs:
         file_list = os.listdir(import_dir)
         file_list.sort()
+        #If we have provided a starting date and time, remove the files that are older than
+        #the provided date.
+
+        if options.start_date is not None:
+          starting_file_list = []
+          starting_datetime = datetime.strptime(options.start_date, '%Y-%m-%dT%H:%M:%S')
+          for file_ndx in range(len(file_list)):
+            if file_list[file_ndx].find('xmrg') != -1:
+              file_date = datetime.strptime(getCollectionDateFromFilename(file_list[file_ndx]), '%Y-%m-%dT%H:%M:%S')
+              if file_date >= starting_datetime:
+                starting_file_list = file_list[file_ndx:-1]
+                break
+          file_list = starting_file_list[:]
+
+
         xmrg_proc.import_files(file_list)
 
     elif options.fill_gaps:
