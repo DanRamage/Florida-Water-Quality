@@ -1,12 +1,33 @@
 import sys
 sys.path.append('../commonfiles')
 
+import logging.config
 from pysqlite2 import dbapi2 as sqlite3
-from dhecDB import dhecDB
+from xenia import xeniaSQLite
+
+#from dhecDB import dhecDB
 from datetime import datetime, timedelta
 from stats import vectorMagDir
 
-class wqDB(dhecDB):
+#class wqDB(dhecDB):
+class wqDB(xeniaSQLite):
+  def __init__(self, dbName, use_logger=True):
+    xeniaSQLite.__init__(self)
+    self.logger = None
+    if use_logger:
+      self.logger = logging.getLogger(type(self).__name__)
+      self.logger.info("creating an instance of dhecDB")
+
+    self.totalRowsProcd = 0
+    self.lastErrorMsg = None
+    if not xeniaSQLite.connect(self, dbName):
+      if self.logger:
+        self.logger.error(self.lastErrorMsg)
+      raise Exception("Unable to connect to database")
+
+  def __del__(self):
+    self.DB.close()
+
   """
   Function: getLastNHoursSummaryFromRadarPrecipSummary
   Purpose: Calculate the rainfall summary for the past N hours for a given rain_gauge/radar.
@@ -19,7 +40,7 @@ class wqDB(dhecDB):
   def getLastNHoursSummaryFromRadarPrecip(self, platform_handle, dateTime, prevHourCnt, obs_type, uom):
     sum = None
     #Get the sensor ID for the obs we are interested in so we can use it to query the data.
-    sensorID = dhecDB.sensorExists(self, obs_type, uom, platform_handle)
+    sensorID = xeniaSQLite.sensorExists(self, obs_type, uom, platform_handle)
 
 
     if(sensorID != None and sensorID != -1):
@@ -87,10 +108,8 @@ class wqDB(dhecDB):
     rainGauge is the rain  gauge we are query the rainfall summary for.
   """
   def getPrecedingRadarDryDaysCount(self, platform_handle, dateTime, obs_type, uom):
-    if dateTime.year == 2003:
-      i = 0
     dry_cnt = -9999
-    sensorId = dhecDB.sensorExists(self, obs_type, uom, platform_handle)
+    sensorId = xeniaSQLite.sensorExists(self, obs_type, uom, platform_handle)
     if sensorId != None and sensorId != -1:
       #We want to start our dry day search the day before our dateTime.
       sql = "SELECT m_date FROM multi_obs WHERE m_date < '%s' AND sensor_id=%d AND m_value > 0 ORDER BY m_date DESC LIMIT 1;"\
@@ -190,8 +209,8 @@ class wqDB(dhecDB):
   """
   def calcRadarRainfallIntensity(self, platform_handle, date, intervalInMinutes=60, obs_type='precipitation_radar_weighted_average', uom='mm'):
     rainfallIntensity = -9999.0
-    #mTypeID = dhecDB.getMTypeFromObsName(self, obs_type, uom, platform_handle,1)
-    sensor_id = dhecDB.sensorExists(self, obs_type, uom, platform_handle)
+    #mTypeID = xeniaSQLite.getMTypeFromObsName(self, obs_type, uom, platform_handle,1)
+    sensor_id = xeniaSQLite.sensorExists(self, obs_type, uom, platform_handle)
 
     if sensor_id:
       rainfallIntensity = self.calcIntensity( platform_handle, sensor_id, date, intervalInMinutes)
@@ -205,9 +224,9 @@ class wqDB(dhecDB):
 
 
   def add_sensor_to_platform(self, platform_handle, sensor_name, uom_name, s_order=1):
-    sensor_id = dhecDB.sensorExists(self, sensor_name, uom_name, platform_handle, 1)
+    sensor_id = xeniaSQLite.sensorExists(self, sensor_name, uom_name, platform_handle, 1)
     if sensor_id == -1:
-      sensor_id = dhecDB.addSensor(self,
+      sensor_id = xeniaSQLite.addSensor(self,
                                     sensor_name, uom_name,
                                     platform_handle,
                                     1,
@@ -215,7 +234,7 @@ class wqDB(dhecDB):
                                     s_order, None, True)
       if sensor_id == -1:
         raise ValueError("Unable to add sensor id for Obs:%s(%s) on platform: %s" % (sensor_name,uom_name, platform_handle))
-    m_type_id = dhecDB.getMTypeFromObsName(self, sensor_name, uom_name, platform_handle, 1)
+    m_type_id = xeniaSQLite.getMTypeFromObsName(self, sensor_name, uom_name, platform_handle, 1)
 
     return sensor_id, m_type_id
 
@@ -239,8 +258,8 @@ class wqDB(dhecDB):
     vectObj = vectorMagDir();
     #Get the wind speed and direction so we can correctly average the data.
     #Get the sensor ID for the obs we are interested in so we can use it to query the data.
-    windSpdId = dhecDB.sensorExists(self, wind_speed_obsname, wind_speed_uom, platName)
-    windDirId = dhecDB.sensorExists(self, wind_dir_obsname, wind_dir_uom, platName)
+    windSpdId = xeniaSQLite.sensorExists(self, wind_speed_obsname, wind_speed_uom, platName)
+    windDirId = xeniaSQLite.sensorExists(self, wind_dir_obsname, wind_dir_uom, platName)
     if windSpdId is not None and windSpdId != -1 and\
       windDirId is not None and windDirId != -1:
       spd_sql = "SELECT m_date ,m_value FROM multi_obs\
