@@ -143,6 +143,8 @@ class EnterococcusPredictionTest(predictionTest):
     if self.logger:
       self.logger.debug("runTest start Site: %s model name: %s formula: %s" % (self.name, self.model_name, self.formula))
 
+    if self.model_name == 'Option A best variables transformed':
+      i = 0
     start_time = time.time()
     try:
       #Get the variables from the formula, then verify the passed in data has the observation and a valid value.
