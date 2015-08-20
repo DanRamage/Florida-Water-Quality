@@ -10,7 +10,7 @@ import logging.config
 
 import netCDF4 as nc
 import numpy as np
-from bisect import bisect_left
+from bisect import bisect_left,bisect_right
 import csv
 
 from wqHistoricalData import wq_data
@@ -23,6 +23,20 @@ from stats import calcAvgSpeedAndDir
 from romsTools import closestCellFromPtInPolygon
 
 meters_per_second_to_mph = 2.23694
+
+def find_le(a, x):
+    'Find rightmost ndx less than or equal to x'
+    i = bisect_right(a, x)
+    if i:
+        return i-1
+    raise ValueError
+
+def find_ge(a, x):
+    'Find leftmost ndx greater than or equal to x'
+    i = bisect_left(a, x)
+    if i != len(a):
+        return i
+    raise ValueError
 """
 florida_sample_sites
 Overrides the default sampling_sites object so we can load the sites from the florida data.
@@ -124,6 +138,7 @@ class florida_wq_historical_data(wq_data):
     self.model_bbox = kwargs['model_bbox']
     self.model_within_polygon = Polygon(kwargs['model_within_polygon'])
 
+
     if self.logger:
       self.logger.debug("Connecting to thredds endpoint for hycom data: %s" % (kwargs['hycom_model_tds_url']))
     self.hycom_model = nc.Dataset(kwargs['hycom_model_tds_url'])
@@ -189,10 +204,10 @@ class florida_wq_historical_data(wq_data):
 
     self.initialize_return_data(wq_tests_data)
 
+    self.get_tide_data(start_date, wq_tests_data)
     self.get_nws_data(start_date, wq_tests_data)
     self.get_c10_data(start_date, wq_tests_data)
     self.get_nexrad_data(start_date, wq_tests_data)
-    self.get_tide_data(start_date, wq_tests_data)
     self.get_hycom_model_data(start_date, wq_tests_data)
 
     if self.logger:
@@ -424,9 +439,9 @@ class florida_wq_historical_data(wq_data):
             #Get the last 24 hour average salinity data
             avg_salinity_pts = salinity_data[adjusted_begin_ndx:adjusted_end_ndx,pt.y,pt.x]
 
-            wq_tests_data['hycom_avg_salinity_%d' % (hour)] = np.average(avg_salinity_pts)
-            wq_tests_data['hycom_min_salinity_%d' % (hour)] = avg_salinity_pts.min()
-            wq_tests_data['hycom_max_salinity_%d' % (hour)] = avg_salinity_pts.max()
+            wq_tests_data['hycom_avg_salinity_%d' % (hour)] = float(np.average(avg_salinity_pts))
+            wq_tests_data['hycom_min_salinity_%d' % (hour)] = float(avg_salinity_pts.min())
+            wq_tests_data['hycom_max_salinity_%d' % (hour)] = float(avg_salinity_pts.max())
 
             adjusted_end_ndx = adjusted_begin_ndx
 
@@ -476,9 +491,9 @@ class florida_wq_historical_data(wq_data):
           water_temp_data = self.hycom_model.variables['temperature'][last_24_ndx:closest_end_ndx,0,self.hycom_latli:self.hycom_latui,self.hycom_lonli:self.hycom_lonui]
           avg_water_temp_pts = water_temp_data[0:last_24_ndx-closest_start_ndx,pt.y,pt.x]
           #Get the water temperature data
-          wq_tests_data['hycom_avg_water_temp_24'] = np.average(avg_water_temp_pts)
-          wq_tests_data['hycom_min_water_temp'] = avg_water_temp_pts.min()
-          wq_tests_data['hycom_max_water_temp'] = avg_water_temp_pts.max()
+          wq_tests_data['hycom_avg_water_temp_24'] = float(np.average(avg_water_temp_pts))
+          wq_tests_data['hycom_min_water_temp'] = float(avg_water_temp_pts.min())
+          wq_tests_data['hycom_max_water_temp'] = float(avg_water_temp_pts.max())
           if self.logger:
             cell_lat = self.hycom_lat_array[pt.y]
             cell_lon = self.hycom_lon_array[pt.x]
@@ -796,6 +811,111 @@ class florida_wq_model_data(florida_wq_historical_data):
       self.logger.debug("Disconnecting xenia obs database.")
     self.xenia_obs_db.disconnect()
 
+  """
+  Function: initialize_return_data
+  Purpose: INitialize our ordered dict with the data variables and assign a NO_DATA
+    initial value.
+  Parameters:
+    wq_tests_data - An OrderedDict that is initialized.
+  Return:
+    None
+  """
+  def initialize_return_data(self, wq_tests_data, initialize_site_specific_data_only):
+    if self.logger:
+      self.logger.debug("Creating and initializing data dict.")
+
+    if not initialize_site_specific_data_only:
+      #Build variables for the base tide station.
+      var_name = 'tide_range_%s' % (self.tide_station)
+      wq_tests_data[var_name] = wq_defines.NO_DATA
+      var_name = 'tide_hi_%s' % (self.tide_station)
+      wq_tests_data[var_name] = wq_defines.NO_DATA
+      var_name = 'tide_lo_%s' % (self.tide_station)
+      wq_tests_data[var_name] = wq_defines.NO_DATA
+
+      wq_tests_data['nws_ksrq_avg_wspd'] = wq_defines.NO_DATA
+      wq_tests_data['nws_ksrq_avg_wdir'] = wq_defines.NO_DATA
+
+      for prev_hours in range(24, 192, 24):
+        wq_tests_data['c10_avg_salinity_%d' % (prev_hours)] = wq_defines.NO_DATA
+        wq_tests_data['c10_min_salinity_%d' % (prev_hours)] = wq_defines.NO_DATA
+        wq_tests_data['c10_max_salinity_%d' % (prev_hours)] = wq_defines.NO_DATA
+
+      wq_tests_data['c10_avg_water_temp_24'] = wq_defines.NO_DATA
+      wq_tests_data['c10_min_water_temp'] = wq_defines.NO_DATA
+      wq_tests_data['c10_max_water_temp'] = wq_defines.NO_DATA
+
+      #Build variables for the subordinate tide station.
+      var_name = 'tide_range_%s' % (self.tide_offset_settings['tide_station'])
+      wq_tests_data[var_name] = wq_defines.NO_DATA
+      var_name = 'tide_hi_%s' % (self.tide_offset_settings['tide_station'])
+      wq_tests_data[var_name] = wq_defines.NO_DATA
+      var_name = 'tide_lo_%s' % (self.tide_offset_settings['tide_station'])
+      wq_tests_data[var_name] = wq_defines.NO_DATA
+
+    for boundary in self.site.contained_by:
+      if len(boundary.name):
+        for prev_hours in range(24, 192, 24):
+          clean_var_boundary_name = boundary.name.lower().replace(' ', '_')
+          var_name = '%s_nexrad_summary_%d' % (clean_var_boundary_name, prev_hours)
+          wq_tests_data[var_name] = wq_defines.NO_DATA
+
+        var_name = '%s_nexrad_dry_days_count' % (clean_var_boundary_name)
+        wq_tests_data[var_name] = wq_defines.NO_DATA
+
+        var_name = '%s_nexrad_rainfall_intesity' % (clean_var_boundary_name)
+        wq_tests_data[var_name] = wq_defines.NO_DATA
+
+        var_name = '%s_nexrad_total_1_day_delay' % (clean_var_boundary_name)
+        wq_tests_data[var_name] = wq_defines.NO_DATA
+        var_name = '%s_nexrad_total_2_day_delay' % (clean_var_boundary_name)
+        wq_tests_data[var_name] = wq_defines.NO_DATA
+        var_name = '%s_nexrad_total_3_day_delay' % (clean_var_boundary_name)
+        wq_tests_data[var_name] = wq_defines.NO_DATA
+
+    for hour in range(24,192,24):
+      wq_tests_data['hycom_avg_salinity_%d' % (hour)] = wq_defines.NO_DATA
+      wq_tests_data['hycom_min_salinity_%d' % (hour)] = wq_defines.NO_DATA
+      wq_tests_data['hycom_max_salinity_%d' % (hour)] = wq_defines.NO_DATA
+
+    wq_tests_data['hycom_avg_water_temp_24'] = wq_defines.NO_DATA
+    wq_tests_data['hycom_min_water_temp'] = wq_defines.NO_DATA
+    wq_tests_data['hycom_max_water_temp'] = wq_defines.NO_DATA
+
+    if self.logger:
+      self.logger.debug("Finished creating and initializing data dict.")
+
+    return
+
+  """
+  Function: query_data
+  Purpose: Retrieves all the data used in the modelling project.
+  Parameters:
+    start_data - Datetime object representing the starting date to query data for.
+    end_date - Datetime object representing the ending date to query data for.
+    wq_tests_data - A OrderedDict object where the retrieved data is store.
+  Return:
+    None
+  """
+  def query_data(self, start_date, end_date, wq_tests_data, reset_site_specific_data_only):
+    if self.logger:
+      self.logger.debug("Site: %s start query data for datetime: %s" % (self.site.name, start_date))
+
+    self.initialize_return_data(wq_tests_data, reset_site_specific_data_only)
+
+    #If we are resetting only the site specific data, no need to re-query these.
+    if not reset_site_specific_data_only:
+      self.get_tide_data(start_date, wq_tests_data)
+      self.get_nws_data(start_date, wq_tests_data)
+      self.get_c10_data(start_date, wq_tests_data)
+
+    self.get_nexrad_data(start_date, wq_tests_data)
+    self.get_hycom_model_data(start_date, wq_tests_data)
+
+    if self.logger:
+      self.logger.debug("Site: %s Finished query data for datetime: %s" % (self.site.name, start_date))
+
+
   def get_c10_data(self, start_date, wq_tests_data):
     #Find the starting time index to work from.
     if self.logger:
@@ -807,52 +927,60 @@ class florida_wq_model_data(florida_wq_historical_data):
       start_epoch_time = float(get_utc_epoch(start_date - timedelta(hours=prev_hour)))
       if end_epoch_time is None:
         end_epoch_time = float(get_utc_epoch(start_date))
-
-      closest_start_ndx = bisect_left(self.c10_times, start_epoch_time)
-      if closest_start_ndx < len(self.c10_times):
-        #For whatever reason, when the value is in the array, bisect keeps returning the index after it.
-        #Convert to int with bankers rounding to overcome floating point issues.
-        #I suspect the issue is floating point precision, but not 100% sure.
-        if np.int64(start_epoch_time + 0.5) == np.int64(self.c10_times[closest_start_ndx-1] + np.float64(0.5)):
-          closest_start_ndx -= 1
-        closest_end_ndx = bisect_left(self.c10_times, end_epoch_time)
-        #Check to make sure end index is not past our desired time.
-        if np.int64(end_epoch_time + 0.5) == np.int64(self.c10_times[closest_end_ndx-1] + np.float64(0.5)):
-          closest_end_ndx -= 1
-
+      try:
+        closest_start_ndx = find_ge(self.c10_times, start_epoch_time)
+        closest_end_ndx = find_le(self.c10_times, end_epoch_time)
+      except ValueError,e:
         if self.logger:
-          start_time = timezone('US/Eastern').localize(datetime.fromtimestamp(np.int64(self.c10_times[closest_start_ndx] + 0.5))).astimezone(timezone('UTC'))
-          end_time = timezone('US/Eastern').localize(datetime.fromtimestamp(np.int64(self.c10_times[closest_end_ndx] + 0.5))).astimezone(timezone('UTC'))
-          self.logger.debug("Thredds C10 Data Start Time: %s Ndx: %d End Time: %s Ndx: %d"\
-            % (start_time.strftime('%Y-%m-%dT%H:%M:%S %Z'), closest_start_ndx, end_time.strftime('%Y-%m-%dT%H:%M:%S %Z'), closest_end_ndx))
-
-        if ((np.int64(self.c10_times[closest_start_ndx] + 0.5) >= np.int64(start_epoch_time + 0.5)) and (np.int64(self.c10_times[closest_start_ndx] + 0.5) < np.int64(end_epoch_time + 0.5))) and\
-           ((np.int64(self.c10_times[closest_end_ndx] + 0.5) > np.int64(start_epoch_time + 0.5)) and (np.int64(self.c10_times[closest_end_ndx] + 0.5) <= np.int64(end_epoch_time + 0.5))):
-
-          c10_salinity = self.c10_salinity[closest_start_ndx:closest_end_ndx]
-
-          #Only calc average on real values, ignore NaNs.
-          c10_no_nan_salinity = c10_salinity[~np.isnan(c10_salinity)]
-          if len(c10_no_nan_salinity):
-            wq_tests_data['c10_avg_salinity_%d' % (prev_hour)] = np.average(c10_no_nan_salinity)
-            wq_tests_data['c10_min_salinity_%d' % (prev_hour)] = c10_no_nan_salinity.min()
-            wq_tests_data['c10_max_salinity_%d' % (prev_hour)] = c10_no_nan_salinity.max()
-          #Only get the 24 hour average of water temp
-          if prev_hour == 24:
-            #Only calc average on real values, ignore NaNs.
-            c10_water_temp = self.c10_water_temp[closest_start_ndx:closest_end_ndx]
-
-            c10_no_nan_water_temp = c10_water_temp[~np.isnan(c10_water_temp)]
-            if len(c10_no_nan_water_temp):
-              wq_tests_data['c10_avg_water_temp_24'] = np.average(c10_no_nan_water_temp)
-              wq_tests_data['c10_min_water_temp'] = c10_no_nan_water_temp.min()
-              wq_tests_data['c10_max_water_temp'] = c10_no_nan_water_temp.max()
-
-        end_epoch_time = start_epoch_time
+          self.logger.exception(e)
       else:
-        if self.logger:
-          self.logger.error("Thredds C10 epoch time: %f out of bounds for thredds time array: %d."\
-            % (start_epoch_time, self.c10_times[-1]))
+        if closest_start_ndx < len(self.c10_times) and closest_end_ndx < len(self.c10_times):
+          #For whatever reason, when the value is in the array, bisect keeps returning the index after it.
+          #Convert to int with bankers rounding to overcome floating point issues.
+          #I suspect the issue is floating point precision, but not 100% sure.
+          if np.int64(start_epoch_time + 0.5) == np.int64(self.c10_times[closest_start_ndx-1] + np.float64(0.5)):
+            closest_start_ndx -= 1
+          #Check to make sure end index is not past our desired time.
+          if np.int64(end_epoch_time + 0.5) == np.int64(self.c10_times[closest_end_ndx-1] + np.float64(0.5)):
+            closest_end_ndx -= 1
+
+          if self.logger:
+            start_time = timezone('US/Eastern').localize(datetime.fromtimestamp(np.int64(self.c10_times[closest_start_ndx] + 0.5))).astimezone(timezone('UTC'))
+            end_time = timezone('US/Eastern').localize(datetime.fromtimestamp(np.int64(self.c10_times[closest_end_ndx] + 0.5))).astimezone(timezone('UTC'))
+            self.logger.debug("Thredds C10 Data Start Time: %s Ndx: %d End Time: %s Ndx: %d"\
+              % (start_time.strftime('%Y-%m-%dT%H:%M:%S %Z'), closest_start_ndx, end_time.strftime('%Y-%m-%dT%H:%M:%S %Z'), closest_end_ndx))
+
+          if ((np.int64(self.c10_times[closest_start_ndx] + 0.5) >= np.int64(start_epoch_time + 0.5)) and (np.int64(self.c10_times[closest_start_ndx] + 0.5) < np.int64(end_epoch_time + 0.5))) and\
+             ((np.int64(self.c10_times[closest_end_ndx] + 0.5) > np.int64(start_epoch_time + 0.5)) and (np.int64(self.c10_times[closest_end_ndx] + 0.5) <= np.int64(end_epoch_time + 0.5))):
+
+            c10_salinity = self.c10_salinity[closest_start_ndx:closest_end_ndx]
+
+            #Only calc average on real values, ignore NaNs.
+            c10_no_nan_salinity = c10_salinity[~np.isnan(c10_salinity)]
+            if len(c10_no_nan_salinity):
+              wq_tests_data['c10_avg_salinity_%d' % (prev_hour)] = float(np.average(c10_no_nan_salinity))
+              wq_tests_data['c10_min_salinity_%d' % (prev_hour)] = float(c10_no_nan_salinity.min())
+              wq_tests_data['c10_max_salinity_%d' % (prev_hour)] = float(c10_no_nan_salinity.max())
+            #Only get the 24 hour average of water temp
+            if prev_hour == 24:
+              #Only calc average on real values, ignore NaNs.
+              c10_water_temp = self.c10_water_temp[closest_start_ndx:closest_end_ndx]
+
+              c10_no_nan_water_temp = c10_water_temp[~np.isnan(c10_water_temp)]
+              if len(c10_no_nan_water_temp):
+                wq_tests_data['c10_avg_water_temp_24'] = float(np.average(c10_no_nan_water_temp))
+                wq_tests_data['c10_min_water_temp'] = float(c10_no_nan_water_temp.min())
+                wq_tests_data['c10_max_water_temp'] = float(c10_no_nan_water_temp.max())
+
+          end_epoch_time = start_epoch_time
+        else:
+          if self.logger:
+            if closest_start_ndx == len(self.c10_times):
+                self.logger.error("Thredds C10 start epoch time: %f out of bounds for thredds time array: %d."\
+                % (start_epoch_time, self.c10_times[-1]))
+            if closest_end_ndx == len(self.c10_times):
+                self.logger.error("Thredds C10 end epoch time: %f out of bounds for thredds time array: %d."\
+                % (end_epoch_time, self.c10_times[-1]))
       if self.logger:
         self.logger.debug("Thredds C10 Start: %s Avg Salinity: %s (%s,%s) Avg Water Temp: %s (%s,%s)"\
                           % (start_date.strftime('%Y-%m-%d %H:%M:%S'),
