@@ -94,6 +94,10 @@ def run_wq_models(**kwargs):
                                   use_logger=True)
 
     site_model_ensemble = []
+    #First pass we want to get all the data, after that we only need to query
+    #the site specific pieces.
+    reset_site_specific_data_only = False
+    site_data = OrderedDict()
     for site in fl_sites:
       try:
         #Get all the models used for the particular sample site.
@@ -120,9 +124,11 @@ def run_wq_models(**kwargs):
         fl_wq_data.reset(site=site,
                           tide_station=tide_station,
                           tide_offset_params=tide_offset_settings)
-        site_data = OrderedDict([('station_name',site.name)])
+        #site_data = OrderedDict([('station_name',site.name)])
+        site_data['station_name'] = site.name
         try:
-          fl_wq_data.query_data(kwargs['begin_date'], kwargs['begin_date'], site_data)
+          fl_wq_data.query_data(kwargs['begin_date'], kwargs['begin_date'], site_data, reset_site_specific_data_only)
+          reset_site_specific_data_only = True
           site_equations.runTests(site_data)
         except Exception,e:
           if logger:
@@ -148,7 +154,7 @@ def output_results(**kwargs):
     mytemplate = Template(filename=results_template)
 
     with open(results_out_file, 'w') as report_out_file:
-      prediction_date = kwargs['prediction_date'].strftime("%Y-%m-%d %H:%M:%S")
+      prediction_date = kwargs['prediction_date'].astimezone(timezone("US/Eastern")).strftime("%Y-%m-%d %H:%M:%S")
       execution_date = kwargs['prediction_run_date'].strftime("%Y-%m-%d %H:%M:%S")
       report_out_file.write(mytemplate.render(ensemble_tests=kwargs['site_model_ensemble'],
                                               prediction_date=prediction_date,
