@@ -7,6 +7,8 @@ from xenia import xeniaSQLite
 
 #from dhecDB import dhecDB
 from datetime import datetime, timedelta
+from pytz import timezone
+
 from stats import vectorMagDir
 
 #class wqDB(dhecDB):
@@ -125,18 +127,22 @@ class wqDB(xeniaSQLite):
       else:
           row = dbCursor.fetchone()
           if row:
-            first_val = datetime.strptime(row['m_date'], "%Y-%m-%dT%H:%M:%S")
+            first_val = timezone('UTC').localize(datetime.strptime(row['m_date'], "%Y-%m-%dT%H:%M:%S"))
             #Now let's check and make sure we're not missing data in between out date of interest
             #and the first date we have with rainfall.
-            if not self.findGaps(dateTime, first_val, sensorId):
-              #Get rid of the time zone.
-              start_date = datetime.strptime(dateTime.strftime("%Y-%m-%dT%H:%M:%S"), "%Y-%m-%dT%H:%M:%S")
-              delta = start_date - first_val
-              dry_cnt = delta.days
+            delta = dateTime - first_val
+            if delta.total_seconds() > (24 * 3600):
+              if not self.findGaps(dateTime, first_val, sensorId):
+                #Get rid of the time zone.
+                start_date = datetime.strptime(dateTime.strftime("%Y-%m-%dT%H:%M:%S"), "%Y-%m-%dT%H:%M:%S")
+                delta = start_date - first_val
+                dry_cnt = delta.days
+              else:
+                if self.logger:
+                  self.logger.debug("NEXRAD data gap found between: %s - %s" %\
+                                      (dateTime.strftime("%Y-%m-%dT%H:%M:%S"), row['m_date']))
             else:
-              if self.logger:
-                self.logger.debug("NEXRAD data gap found between: %s - %s" %\
-                                    (dateTime.strftime("%Y-%m-%dT%H:%M:%S"), row['m_date']))
+              dry_cnt = 0
     else:
       if self.logger:
         self.logger.error("No sensor id found for platform: %s." % (platform_handle))

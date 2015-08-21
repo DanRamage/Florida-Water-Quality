@@ -9,6 +9,9 @@ import traceback
 import optparse
 import ConfigParser
 from collections import OrderedDict
+from mako.template import Template
+from mako import exceptions as makoExceptions
+
 from wq_prediction_tests import wqEquations
 from enterococcus_wq_test import EnterococcusPredictionTest
 
@@ -48,13 +51,16 @@ def build_test_objects(config_file, site_name):
 
 def run_wq_models(**kwargs):
   logger = logging.getLogger('run_wq_models_logger')
-
+  prediction_testrun_date = datetime.now()
   config_file = kwargs['config_file']
   try:
     boundaries_location_file = config_file.get('boundaries_settings', 'boundaries_file')
     sites_location_file = config_file.get('boundaries_settings', 'sample_sites')
     xenia_wq_db_file = config_file.get('database', 'name')
-    c_10_tds_url = config_file.get('c10_data', 'historical_qaqc_thredds')
+    c_10_tds_url = config_file.get('c10_data', 'thredds_url')
+    c_10_time_var = config_file.get('c10_data', 'time_variable_name')
+    c_10_salinity_var = config_file.get('c10_data', 'salinity_variable_name')
+    c_10_water_temp_var = config_file.get('c10_data', 'water_temp_variable_name')
     hycom_model_tds_url = config_file.get('hycom_model_data', 'thredds_url')
     model_bbox = config_file.get('hycom_model_data', 'bbox').split(',')
     poly_parts = config_file.get('hycom_model_data', 'within_polygon').split(';')
@@ -74,17 +80,24 @@ def run_wq_models(**kwargs):
 
     fl_wq_data = florida_wq_model_data(xenia_database_name=xenia_wq_db_file,
                                   c_10_tds_url=c_10_tds_url,
+                                  c_10_time_var=c_10_time_var,
+                                  c_10_salinity_var=c_10_salinity_var,
+                                  c_10_water_temp_var=c_10_water_temp_var,
                                   hycom_model_tds_url=hycom_model_tds_url,
                                   model_bbox=model_bbox,
                                   model_within_polygon=model_within_polygon,
-                                  use_logger=True,
                                   xenia_obs_db_type='postgres',
                                   xenia_obs_db_host=xenia_obs_db_host,
                                   xenia_obs_db_user=xenia_obs_db_user,
                                   xenia_obs_db_password=xenia_obs_db_password,
-                                  xenia_obs_db_name=xenia_obs_db_name)
+                                  xenia_obs_db_name=xenia_obs_db_name,
+                                  use_logger=True)
 
     site_model_ensemble = []
+    #First pass we want to get all the data, after that we only need to query
+    #the site specific pieces.
+    reset_site_specific_data_only = False
+    site_data = OrderedDict()
     for site in fl_sites:
       try:
         #Get all the models used for the particular sample site.
@@ -111,12 +124,53 @@ def run_wq_models(**kwargs):
         fl_wq_data.reset(site=site,
                           tide_station=tide_station,
                           tide_offset_params=tide_offset_settings)
-        site_data = OrderedDict([('station_name',site.name)])
+        #site_data = OrderedDict([('station_name',site.name)])
+        site_data['station_name'] = site.name
         try:
-          fl_wq_data.query_data(kwargs['begin_date'], kwargs['begin_date'], site_data)
+          fl_wq_data.query_data(kwargs['begin_date'], kwargs['begin_date'], site_data, reset_site_specific_data_only)
+          reset_site_specific_data_only = True
+          site_equations.runTests(site_data)
         except Exception,e:
           if logger:
             logger.exception(e)
+    output_results(site_model_ensemble=site_model_ensemble,
+                   config_file=config_file,
+                   prediction_date=kwargs['begin_date'],
+                   prediction_run_date=prediction_testrun_date)
+
+  return
+
+def output_results(**kwargs):
+  logger = logging.getLogger('output_results_logger')
+
+  try:
+    config_file = kwargs['config_file']
+    results_template = config_file.get('output', 'results_template')
+    results_out_file = config_file.get('output', 'results_output_file')
+  except ConfigParser.Error, e:
+    if logger:
+      logger.exception(e)
+  try:
+    mytemplate = Template(filename=results_template)
+
+    with open(results_out_file, 'w') as report_out_file:
+      prediction_date = kwargs['prediction_date'].astimezone(timezone("US/Eastern")).strftime("%Y-%m-%d %H:%M:%S")
+      execution_date = kwargs['prediction_run_date'].strftime("%Y-%m-%d %H:%M:%S")
+      report_out_file.write(mytemplate.render(ensemble_tests=kwargs['site_model_ensemble'],
+                                              prediction_date=prediction_date,
+                                              execution_date=execution_date))
+  except Exception,e:
+    if logger:
+      logger.exception(makoExceptions.text_error_template().render())
+  except TypeError,e:
+    if logger:
+      logger.exception(makoExceptions.text_error_template().render())
+  except IOError,e:
+    if logger:
+      logger.exception(e)
+  except AttributeError, e:
+    if logger:
+      logger.exception(e)
 
 
   return
