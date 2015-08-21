@@ -134,8 +134,8 @@ class wqDB(xeniaSQLite):
             if delta.total_seconds() > (24 * 3600):
               if not self.findGaps(dateTime, first_val, sensorId):
                 #Get rid of the time zone.
-                start_date = datetime.strptime(dateTime.strftime("%Y-%m-%dT%H:%M:%S"), "%Y-%m-%dT%H:%M:%S")
-                delta = start_date - first_val
+                #start_date = datetime.strptime(dateTime.strftime("%Y-%m-%dT%H:%M:%S"), "%Y-%m-%dT%H:%M:%S")
+                #delta = start_date - first_val
                 dry_cnt = delta.days
               else:
                 if self.logger:
