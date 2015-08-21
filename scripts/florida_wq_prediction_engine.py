@@ -130,6 +130,9 @@ def run_wq_models(**kwargs):
           fl_wq_data.query_data(kwargs['begin_date'], kwargs['begin_date'], site_data, reset_site_specific_data_only)
           reset_site_specific_data_only = True
           site_equations.runTests(site_data)
+          total_test_time = sum(testObj.test_time for testObj in site_equations.tests)
+          if logger:
+            logger.debug("Site: %s total time to execute models: %f ms" % (site.name, total_test_time * 1000))
         except Exception,e:
           if logger:
             logger.exception(e)

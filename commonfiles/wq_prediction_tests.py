@@ -37,6 +37,8 @@ class predictionTest(object):
     self.formula = formula
     self.predictionLevel = predictionLevels(predictionLevels.NO_TEST)
     self.name = name
+    self.test_time = None
+
   """
   Function: runTest
   Purpose: Uses the data parameter to do the string substitutions then evaluate the formula.
@@ -84,6 +86,7 @@ class wqEquations(object):
     for model_equation in model_equation_list:
       self.tests.append(model_equation)
     self.data = {} #Data used for the tests.
+
     self.logger = None
     if use_logger:
       self.logger = logging.getLogger(type(self).__name__)
@@ -134,6 +137,7 @@ class wqEquations(object):
         if testObj.predictionLevel != predictionLevels.NO_TEST:
           sum += testObj.predictionLevel.value
           executedTstCnt += 1
+
       if executedTstCnt:
         self.ensemblePrediction = int(round(sum / float(executedTstCnt)))
 
