@@ -1032,6 +1032,8 @@ def main():
     elif options.fill_gaps:
       if options.start_date is None:
         start_date_time = timezone('US/Eastern').localize(datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)).astimezone(timezone('UTC'))
+      else:
+        start_date_time = timezone('UTC').localize(datetime.strptime(options.start_date, "%Y-%m-%dT%H:%M:%S"))
       if logger:
         logger.info("Fill gaps Start time: %s Prev Hours: %d" % (start_date_time, options.backfill_n_hours))
 
