@@ -16,6 +16,7 @@ from wq_prediction_tests import wqEquations
 from enterococcus_wq_test import EnterococcusPredictionTest
 
 from florida_wq_data import florida_wq_model_data, florida_sample_sites
+from wq_results import _resolve
 
 def build_test_objects(config_file, site_name):
   logger = logging.getLogger('build_test_objects_logger')
@@ -53,6 +54,7 @@ def run_wq_models(**kwargs):
   logger = logging.getLogger('run_wq_models_logger')
   prediction_testrun_date = datetime.now()
   config_file = kwargs['config_file']
+
   try:
     boundaries_location_file = config_file.get('boundaries_settings', 'boundaries_file')
     sites_location_file = config_file.get('boundaries_settings', 'sample_sites')
@@ -146,13 +148,40 @@ def run_wq_models(**kwargs):
 def output_results(**kwargs):
   logger = logging.getLogger('output_results_logger')
 
+  output_obj_list = []
   try:
     config_file = kwargs['config_file']
-    results_template = config_file.get('output', 'results_template')
-    results_out_file = config_file.get('output', 'results_output_file')
+    #results_template = config_file.get('output', 'results_template')
+    #results_out_file = config_file.get('output', 'results_output_file')
+    output_list = config_file.get("output", "handlers")
   except ConfigParser.Error, e:
     if logger:
       logger.exception(e)
+  else:
+    for output_type in output_list.split(','):
+      try:
+        klass = config_file.get('handler_%s' % (output_type), 'class')
+        args = config_file.get('handler_%s' % (output_type), 'args')
+        klass_obj = _resolve(klass)
+        args = eval(args)
+        klass_obj = klass_obj(*args)
+        output_obj_list.append(klass_obj)
+      except ConfigParser.Error, e:
+        if logger:
+          logger.exception(e)
+      except Exception, e:
+        if logger:
+          logger.exception(e)
+
+    for output_obj in output_obj_list:
+      record = {
+        'prediction_date': kwargs['prediction_date'].astimezone(timezone("US/Eastern")).strftime("%Y-%m-%d %H:%M:%S"),
+        'execution_date': kwargs['prediction_run_date'].strftime("%Y-%m-%d %H:%M:%S"),
+        'ensemble_tests': kwargs['site_model_ensemble']
+      }
+      output_obj.output(record)
+
+  """
   try:
     mytemplate = Template(filename=results_template)
 
@@ -174,7 +203,7 @@ def output_results(**kwargs):
   except AttributeError, e:
     if logger:
       logger.exception(e)
-
+  """
 
   return
 
