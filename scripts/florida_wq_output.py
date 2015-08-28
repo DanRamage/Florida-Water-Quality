@@ -3,8 +3,8 @@ from mako.template import Template
 from mako import exceptions as makoExceptions
 from datetime import datetime
 from pytz import timezone
-
-
+import simplejson as json
+from smtp_utils import smtpClass
 
 class email_wq_results(wq_results):
   def __init__(self,
@@ -29,25 +29,37 @@ class email_wq_results(wq_results):
     self.results_template = results_template
 
   def emit(self, record):
+    if self.logger:
+      self.logger.debug("Starting emit for email output.")
     try:
       mytemplate = Template(filename=self.results_template)
 
       with open(self.result_outfile, 'w') as report_out_file:
-        report_out_file.write(mytemplate.render(ensemble_tests=record['ensemble_tests'],
+        results_report = mytemplate.render(ensemble_tests=record['ensemble_tests'],
                                                 prediction_date=record['prediction_date'],
-                                                execution_date=record['execution_date']))
-    except Exception,e:
-      if self.logger:
-        self.logger.exception(makoExceptions.text_error_template().render())
+                                                execution_date=record['execution_date'])
+        report_out_file.write(results_report)
     except TypeError,e:
       if self.logger:
         self.logger.exception(makoExceptions.text_error_template().render())
-    except IOError,e:
+    except (IOError,AttributeError,Exception) as e:
       if self.logger:
         self.logger.exception(e)
-    except AttributeError, e:
-      if self.logger:
-        self.logger.exception(e)
+    else:
+      try:
+        subject = "[WQ] Sarasota Prediction Results for %s" % (record['prediction_date'])
+        #Now send the email.
+        smtp = smtpClass(host=self.mailhost, user=self.user, password=self.password)
+        smtp.rcpt_to(self.toaddrs)
+        smtp.from_addr(self.fromaddr)
+        smtp.subject(subject)
+        smtp.message(results_report)
+        smtp.send(content_type="html")
+      except Exception,e:
+        if self.logger:
+          self.logger.exception(e)
+    if self.logger:
+      self.logger.debug("Finished emit for email output.")
 
 class json_wq_results(wq_results):
   def __init__(self, json_outfile, use_logging):
@@ -55,4 +67,54 @@ class json_wq_results(wq_results):
     self.json_outfile = json_outfile
 
   def emit(self, record):
+    if self.logger:
+      self.logger.debug("Starting emit for json output.")
+
+    ensemble_data = record['ensemble_tests']
+    try:
+      with open(self.json_outfile, 'w') as json_output_file:
+        station_data = {'features' : [],
+                        'type': 'FeatureCollection'}
+        features = []
+        for site_metadata, test_results in ensemble_data:
+          test_data = []
+          for test in test_results.tests:
+            test_data.append({
+              'name': test.model_name,
+              'p_level': test.predictionLevel.__str__(),
+              'p_value': test.mlrResult,
+              'data': test.data_used
+            })
+          features.append({
+            'type': 'Feature',
+            'geometry' : {
+              'type': 'Point',
+              'coordinates': [site_metadata.object_geometry.x, site_metadata.object_geometry.y]
+            },
+            'properties': {
+              'desc': site_metadata.name,
+              'ensemble': "",
+              'station': site_metadata.name,
+              'tests': test_data
+            }
+          })
+        station_data['features'] = features
+        json_data = {
+          'status': {'http_code': 200},
+          'contents': {
+            'run_date': record['execution_date'],
+            'testDate': record['prediction_date'],
+            'stationData': station_data
+          }
+        }
+        try:
+          json_output_file.write(json.dumps(json_data, sort_keys=True))
+        except Exception,e:
+          if self.logger:
+            self.logger.exception(e)
+    except IOError,e:
+      if self.logger:
+        self.logger.exception(e)
+    if self.logger:
+      self.logger.debug("Finished emit for json output.")
     return

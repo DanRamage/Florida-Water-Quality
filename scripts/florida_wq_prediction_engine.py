@@ -16,10 +16,13 @@ from wq_prediction_tests import wqEquations
 from enterococcus_wq_test import EnterococcusPredictionTest
 
 from florida_wq_data import florida_wq_model_data, florida_sample_sites
-from wq_results import _resolve
+from wq_results import _resolve, results_exporter
 
-def build_test_objects(config_file, site_name):
-  logger = logging.getLogger('build_test_objects_logger')
+
+def build_test_objects(config_file, site_name, use_logging):
+  logger = None
+  if use_logging:
+    logger = logging.getLogger('build_test_objects_logger')
 
   model_list = []
   #Get the sites test configuration ini, then build the test objects.
@@ -51,9 +54,13 @@ def build_test_objects(config_file, site_name):
   return model_list
 
 def run_wq_models(**kwargs):
-  logger = logging.getLogger('run_wq_models_logger')
+  logger = None
+  if kwargs['use_logging']:
+    logger = logging.getLogger('run_wq_models_logger')
   prediction_testrun_date = datetime.now()
-  config_file = kwargs['config_file']
+
+  config_file = ConfigParser.RawConfigParser()
+  config_file.read(kwargs['config_file_name'])
 
   try:
     boundaries_location_file = config_file.get('boundaries_settings', 'boundaries_file')
@@ -103,10 +110,10 @@ def run_wq_models(**kwargs):
     for site in fl_sites:
       try:
         #Get all the models used for the particular sample site.
-        model_list = build_test_objects(config_file, site.name)
+        model_list = build_test_objects(config_file, site.name, kwargs['use_logging'])
         #Create the container for all the models.
         site_equations = wqEquations(site.name, model_list, True)
-        site_model_ensemble.append(site_equations)
+        site_model_ensemble.append((site, site_equations))
 
         #Get the station specific tide stations
         tide_station = config_file.get(site.name, 'tide_station')
@@ -139,71 +146,27 @@ def run_wq_models(**kwargs):
           if logger:
             logger.exception(e)
     output_results(site_model_ensemble=site_model_ensemble,
-                   config_file=config_file,
+                   config_file_name=kwargs['config_file_name'],
                    prediction_date=kwargs['begin_date'],
-                   prediction_run_date=prediction_testrun_date)
+                   prediction_run_date=prediction_testrun_date,
+                   use_logging=kwargs['use_logging'])
 
   return
 
 def output_results(**kwargs):
-  logger = logging.getLogger('output_results_logger')
+  logger = None
+  if kwargs['use_logging']:
+    logger = logging.getLogger('output_results_logger')
 
-  output_obj_list = []
-  try:
-    config_file = kwargs['config_file']
-    #results_template = config_file.get('output', 'results_template')
-    #results_out_file = config_file.get('output', 'results_output_file')
-    output_list = config_file.get("output", "handlers")
-  except ConfigParser.Error, e:
-    if logger:
-      logger.exception(e)
-  else:
-    for output_type in output_list.split(','):
-      try:
-        klass = config_file.get('handler_%s' % (output_type), 'class')
-        args = config_file.get('handler_%s' % (output_type), 'args')
-        klass_obj = _resolve(klass)
-        args = eval(args)
-        klass_obj = klass_obj(*args)
-        output_obj_list.append(klass_obj)
-      except ConfigParser.Error, e:
-        if logger:
-          logger.exception(e)
-      except Exception, e:
-        if logger:
-          logger.exception(e)
+  record = {
+    'prediction_date': kwargs['prediction_date'].astimezone(timezone("US/Eastern")).strftime("%Y-%m-%d %H:%M:%S"),
+    'execution_date': kwargs['prediction_run_date'].strftime("%Y-%m-%d %H:%M:%S"),
+    'ensemble_tests': kwargs['site_model_ensemble']
+  }
 
-    for output_obj in output_obj_list:
-      record = {
-        'prediction_date': kwargs['prediction_date'].astimezone(timezone("US/Eastern")).strftime("%Y-%m-%d %H:%M:%S"),
-        'execution_date': kwargs['prediction_run_date'].strftime("%Y-%m-%d %H:%M:%S"),
-        'ensemble_tests': kwargs['site_model_ensemble']
-      }
-      output_obj.output(record)
-
-  """
-  try:
-    mytemplate = Template(filename=results_template)
-
-    with open(results_out_file, 'w') as report_out_file:
-      prediction_date = kwargs['prediction_date'].astimezone(timezone("US/Eastern")).strftime("%Y-%m-%d %H:%M:%S")
-      execution_date = kwargs['prediction_run_date'].strftime("%Y-%m-%d %H:%M:%S")
-      report_out_file.write(mytemplate.render(ensemble_tests=kwargs['site_model_ensemble'],
-                                              prediction_date=prediction_date,
-                                              execution_date=execution_date))
-  except Exception,e:
-    if logger:
-      logger.exception(makoExceptions.text_error_template().render())
-  except TypeError,e:
-    if logger:
-      logger.exception(makoExceptions.text_error_template().render())
-  except IOError,e:
-    if logger:
-      logger.exception(e)
-  except AttributeError, e:
-    if logger:
-      logger.exception(e)
-  """
+  results_out = results_exporter(kwargs['use_logging'])
+  results_out.load_configuration(kwargs['config_file_name'])
+  results_out.output(record)
 
   return
 
@@ -225,11 +188,13 @@ def main():
     config_file.read(options.config_file)
 
     logger = None
+    use_logging = False
     logConfFile = config_file.get('logging', 'prediction_engine')
     if logConfFile:
       logging.config.fileConfig(logConfFile)
       logger = logging.getLogger('florida_wq_predicition_logger')
       logger.info("Log file opened.")
+      use_logging = True
 
   except ConfigParser.Error, e:
     traceback.print_exc(e)
@@ -254,7 +219,8 @@ def main():
 
     try:
       run_wq_models(begin_date=begin_date,
-                    config_file=config_file)
+                    config_file_name=options.config_file,
+                    use_logging=use_logging)
     except Exception, e:
       logger.exception(e)
 

@@ -37,6 +37,12 @@ def find_ge(a, x):
     if i != len(a):
         return i
     raise ValueError
+
+class florida_wq_site(station_geometry):
+  def __init__(self, name, wkt, epa_id):
+    station_geometry.__init__(self, name, wkt)
+    self.epa_id = epa_id
+    return
 """
 florida_sample_sites
 Overrides the default sampling_sites object so we can load the sites from the florida data.
@@ -1016,14 +1022,14 @@ class florida_wq_model_data(florida_wq_historical_data):
           .filter(multi_obs.sensor_id == wind_spd_sensor_id)\
           .filter(multi_obs.m_date >= begin_date)\
           .filter(multi_obs.m_date < end_date)\
-          .order_by(multi_obs.m_date)
+          .order_by(multi_obs.m_date).all()
 
         wind_dir_data = self.xenia_obs_db.session.query(multi_obs)\
           .filter(multi_obs.platform_handle.ilike(platform_handle))\
           .filter(multi_obs.sensor_id == wind_dir_sensor_id)\
           .filter(multi_obs.m_date >= begin_date)\
           .filter(multi_obs.m_date < end_date)\
-          .order_by(multi_obs.m_date)
+          .order_by(multi_obs.m_date).all()
       except Exception, e:
         if self.logger:
           self.logger.exception(e)

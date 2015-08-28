@@ -36,7 +36,7 @@ class wq_results(object):
     self.emit(record)
 
 
-class output_results(object):
+class results_exporter(object):
   def __init__(self, use_logging):
     self.logger = None
     if use_logging:

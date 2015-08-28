@@ -19,10 +19,10 @@
                 <h3>Prediction executed: ${execution_date}</h3>
                 </br>
             </div>
-            % for ensemble in ensemble_tests:
+            % for site_metadata, ensemble in ensemble_tests:
                 <div class="row">
                     <div class="xs-md-6">
-                      <h2>Site: ${ensemble.station}</h2>
+                      <h2>Site: ${site_metadata.name}</h2>
                     </div>
                 </div>
                 <div class="row">
