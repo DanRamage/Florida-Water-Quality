@@ -831,13 +831,6 @@ class florida_wq_model_data(florida_wq_historical_data):
       self.logger.debug("Creating and initializing data dict.")
 
     if not initialize_site_specific_data_only:
-      #Build variables for the base tide station.
-      var_name = 'tide_range_%s' % (self.tide_station)
-      wq_tests_data[var_name] = wq_defines.NO_DATA
-      var_name = 'tide_hi_%s' % (self.tide_station)
-      wq_tests_data[var_name] = wq_defines.NO_DATA
-      var_name = 'tide_lo_%s' % (self.tide_station)
-      wq_tests_data[var_name] = wq_defines.NO_DATA
 
       wq_tests_data['nws_ksrq_avg_wspd'] = wq_defines.NO_DATA
       wq_tests_data['nws_ksrq_avg_wdir'] = wq_defines.NO_DATA
@@ -851,13 +844,20 @@ class florida_wq_model_data(florida_wq_historical_data):
       wq_tests_data['c10_min_water_temp'] = wq_defines.NO_DATA
       wq_tests_data['c10_max_water_temp'] = wq_defines.NO_DATA
 
-      #Build variables for the subordinate tide station.
-      var_name = 'tide_range_%s' % (self.tide_offset_settings['tide_station'])
-      wq_tests_data[var_name] = wq_defines.NO_DATA
-      var_name = 'tide_hi_%s' % (self.tide_offset_settings['tide_station'])
-      wq_tests_data[var_name] = wq_defines.NO_DATA
-      var_name = 'tide_lo_%s' % (self.tide_offset_settings['tide_station'])
-      wq_tests_data[var_name] = wq_defines.NO_DATA
+    #Build variables for the base tide station.
+    var_name = 'tide_range_%s' % (self.tide_station)
+    wq_tests_data[var_name] = wq_defines.NO_DATA
+    var_name = 'tide_hi_%s' % (self.tide_station)
+    wq_tests_data[var_name] = wq_defines.NO_DATA
+    var_name = 'tide_lo_%s' % (self.tide_station)
+    wq_tests_data[var_name] = wq_defines.NO_DATA
+    #Build variables for the subordinate tide station.
+    var_name = 'tide_range_%s' % (self.tide_offset_settings['tide_station'])
+    wq_tests_data[var_name] = wq_defines.NO_DATA
+    var_name = 'tide_hi_%s' % (self.tide_offset_settings['tide_station'])
+    wq_tests_data[var_name] = wq_defines.NO_DATA
+    var_name = 'tide_lo_%s' % (self.tide_offset_settings['tide_station'])
+    wq_tests_data[var_name] = wq_defines.NO_DATA
 
     for boundary in self.site.contained_by:
       if len(boundary.name):
@@ -911,10 +911,10 @@ class florida_wq_model_data(florida_wq_historical_data):
 
     #If we are resetting only the site specific data, no need to re-query these.
     if not reset_site_specific_data_only:
-      self.get_tide_data(start_date, wq_tests_data)
       self.get_nws_data(start_date, wq_tests_data)
       self.get_c10_data(start_date, wq_tests_data)
 
+    self.get_tide_data(start_date, wq_tests_data)
     self.get_nexrad_data(start_date, wq_tests_data)
     self.get_hycom_model_data(start_date, wq_tests_data)
 
