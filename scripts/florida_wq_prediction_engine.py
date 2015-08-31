@@ -107,6 +107,7 @@ def run_wq_models(**kwargs):
     #the site specific pieces.
     reset_site_specific_data_only = False
     site_data = OrderedDict()
+    total_time = 0
     for site in fl_sites:
       try:
         #Get all the models used for the particular sample site.
@@ -142,9 +143,12 @@ def run_wq_models(**kwargs):
           total_test_time = sum(testObj.test_time for testObj in site_equations.tests)
           if logger:
             logger.debug("Site: %s total time to execute models: %f ms" % (site.name, total_test_time * 1000))
+          total_time += total_test_time
         except Exception,e:
           if logger:
             logger.exception(e)
+    if logger:
+      logger.debug("Total time to execute all sites models: %f ms" % (total_time * 1000))
     output_results(site_model_ensemble=site_model_ensemble,
                    config_file_name=kwargs['config_file_name'],
                    prediction_date=kwargs['begin_date'],
@@ -157,17 +161,22 @@ def output_results(**kwargs):
   logger = None
   if kwargs['use_logging']:
     logger = logging.getLogger('output_results_logger')
-
+    logger.debug("Starting output_results")
   record = {
     'prediction_date': kwargs['prediction_date'].astimezone(timezone("US/Eastern")).strftime("%Y-%m-%d %H:%M:%S"),
     'execution_date': kwargs['prediction_run_date'].strftime("%Y-%m-%d %H:%M:%S"),
     'ensemble_tests': kwargs['site_model_ensemble']
   }
+  try:
+    results_out = results_exporter(kwargs['use_logging'])
+    results_out.load_configuration(kwargs['config_file_name'])
+    results_out.output(record)
+  except Exception, e:
+    if logger:
+      logger.exception(e)
 
-  results_out = results_exporter(kwargs['use_logging'])
-  results_out.load_configuration(kwargs['config_file_name'])
-  results_out.output(record)
-
+  if logger:
+    logger.debug("Finished output_results")
   return
 
 def main():
@@ -204,8 +213,8 @@ def main():
       #We are going to process the previous day, so we get the current date, set the time to midnight, then convert
       #to UTC.
       eastern = timezone('US/Eastern')
-      est = eastern.localize(datetime.strptime(options.startDateTime, "%Y-%m-%d %H:%M:%S"))
-      est = est - timedelta(days=1)
+      est = eastern.localize(datetime.strptime(options.startDateTime, "%Y-%m-%dT%H:%M:%S"))
+      #est = est - timedelta(days=1)
       #Convert to UTC
       begin_date = est.astimezone(timezone('UTC'))
       end_date = begin_date + timedelta(hours=24)
