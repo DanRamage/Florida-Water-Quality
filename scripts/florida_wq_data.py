@@ -39,9 +39,11 @@ def find_ge(a, x):
     raise ValueError
 
 class florida_wq_site(station_geometry):
-  def __init__(self, name, wkt, epa_id):
-    station_geometry.__init__(self, name, wkt)
-    self.epa_id = epa_id
+  def __init__(self, **kwargs):
+    station_geometry.__init__(self, kwargs['name'], kwargs['wkt'])
+    self.epa_id = kwargs['epa_id']
+    self.description = kwargs['description']
+    self.county = kwargs['county']
     return
 """
 florida_sample_sites
@@ -69,7 +71,7 @@ class florida_sample_sites(sampling_sites):
         fl_boundaries.load(kwargs['boundary_file'])
 
       try:
-        header_row = ["WKT","EPAbeachID","SPLocation","Boundary"]
+        header_row = ["WKT","EPAbeachID","SPLocation","Description","County","Boundary"]
         if self.logger:
           self.logger.debug("Reading sample sites file: %s" % (kwargs['file_name']))
 
@@ -87,7 +89,18 @@ class florida_sample_sites(sampling_sites):
             station = self.get_site(row['SPLocation'])
             if station is None:
               add_site = True
-              station = station_geometry(row['SPLocation'], row['WKT'])
+              """
+              station_geometry.__init__(self, kwargs['name'], kwargs['wkt'])
+              self.epa_id = kwargs['epa_id']
+              self.description = kwargs['description']
+              self.county = kwargs['county']
+
+              """
+              station = florida_wq_site(name=row['SPLocation'],
+                                        wkt=row['WKT'],
+                                        epa_id=row['EPAbeachID'],
+                                        description=row['Description'],
+                                        county=row['County'])
               self.append(station)
 
               boundaries =  row['Boundary'].split(',')
