@@ -114,12 +114,16 @@ def parse_sheet_data(xl_file_name, config_file, use_logging):
     #Let's go site by site and find the data in the worksheet. Currently we only get the
     #data for Sarasota county.
     for site in fl_sites:
-      for row_num in range(1,18):
+      if logger:
+        logger.debug("Site: %s Desc: %s searching worsheet" % (site.name, site.description))
+      for row_num in range(2,18):
         cell_name = "%s%d" % (station_column, row_num)
         cell_value = "%s%d" % (entero_column, row_num)
         cell_date = "%s%d" % (date_column, row_num)
         cell_time = "%s%d" % (time_column, row_num)
         if bacteria_data_sheet[cell_name].value.strip().lower() == site.description.lower():
+          if logger:
+            logger.debug("Adding feature site: %s Desc: %s" % (site.name, site.description))
           #Build the json structure the web app is going to use.
           sample_date_time = datetime.combine(bacteria_data_sheet[cell_date].value, bacteria_data_sheet[cell_time].value)
           features.append({
@@ -146,13 +150,20 @@ def parse_sheet_data(xl_file_name, config_file, use_logging):
 
           })
           break
-    with open(advisory_results_filename, "w") as json_out_file:
-      #Now output JSON file.
-      json_data = {
-        'type': 'FeatureCollection',
-        'features': features
-      }
-      json_out_file.write(json.dumps(json_data, sort_keys=True))
+    try:
+      with open(advisory_results_filename, "w") as json_out_file:
+        #Now output JSON file.
+        json_data = {
+          'type': 'FeatureCollection',
+          'features': features
+        }
+        json_out_file.write(json.dumps(json_data, sort_keys=True))
+    except (json.JSONDecodeError, IOError) as e:
+      if logger:
+        logger.exception(e)
+    if logger:
+      logger.debug("Finished parse_sheet_data")
+
   return
 
 def main():
