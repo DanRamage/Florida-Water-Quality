@@ -9,11 +9,18 @@ import email
 import optparse
 import ConfigParser
 import simplejson as json
-from datetime import datetime
+import datetime
 
 from florida_wq_data import florida_sample_sites
 
+def contains(list, filter):
+  for x in list:
+    if filter(x):
+      return True
+  return False
+
 def check_email_for_update(config_file, use_logging):
+  file_list = []
   logger = None
   if use_logging:
     logger = logging.getLogger('check_email_for_update_logger')
@@ -67,66 +74,180 @@ def check_email_for_update(config_file, use_logging):
             continue
 
           filename = part.get_filename()
-          if not(filename):
-            filename = "sarasota_bacteria.xls"
-          if logger:
-            logger.debug("Attached filename: %s" % (filename))
+          if filename.find('xlsx') != -1:
+            if logger:
+              logger.debug("Attached filename: %s" % (filename))
 
-          saved_file_name = os.path.join(destination_directory, filename)
-          with open(saved_file_name, 'wb') as out_file:
-            out_file.write(part.get_payload(decode=1))
-            out_file.close()
-
-            parse_sheet_data(saved_file_name, config_file, use_logging)
+            saved_file_name = os.path.join(destination_directory, filename)
+            with open(saved_file_name, 'wb') as out_file:
+              out_file.write(part.get_payload(decode=1))
+              out_file.close()
+              file_list.append(saved_file_name)
+            #parse_sheet_data(saved_file_name, use_logging)
 
     #pop3_obj.quit()
 
   if logger:
     logger.debug("Finished check_email_for_update")
-  return
+  return file_list
 
-def parse_sheet_data(xl_file_name, config_file, use_logging):
+def parse_sheet_data(xl_file_name, use_logging):
   logger = None
   if use_logging:
     logger = logging.getLogger('check_email_for_update_logger')
-    logger.debug("Starting parse_sheet_data")
+    logger.debug("Starting parse_sheet_data, parsing file: %s" % (xl_file_name))
+
+
+  sample_data = {}
+  wb = load_workbook(filename = xl_file_name)
+  bacteria_data_sheet = wb['SCHD Bact Results']
+  date_column = 'A'
+  time_column = 'B'
+  station_column = 'D'
+  entero_column = 'H'
+  for row_num in range(2,18):
+    cell_name = "%s%d" % (station_column, row_num)
+    cell_value = "%s%d" % (entero_column, row_num)
+    cell_date = "%s%d" % (date_column, row_num)
+    cell_time = "%s%d" % (time_column, row_num)
+    if isinstance(bacteria_data_sheet[cell_time].value, datetime.time):
+      sample_date_time = datetime.datetime.combine(bacteria_data_sheet[cell_date].value, bacteria_data_sheet[cell_time].value)
+    else:
+      sample_date_time = bacteria_data_sheet[cell_date].value
+    sample_data[bacteria_data_sheet[cell_name].value.strip().lower()] = {
+      'sample_date': sample_date_time,
+      'value': bacteria_data_sheet[cell_value].value
+    }
+  if logger:
+    logger.debug("Finished parse_sheet_data")
+
+  return sample_data
+
+def build_predictions_file(bacteria_data, config_file, fl_sites, use_logging):
+  logger = None
+  if use_logging:
+    logger = logging.getLogger('build_predictions_file_logger')
+    logger.debug("Starting build_predictions_file")
 
   try:
     advisory_results_filename = config_file.get('json_settings', 'advisory_results')
-    boundaries_location_file = config_file.get('boundaries_settings', 'boundaries_file')
-    sites_location_file = config_file.get('boundaries_settings', 'sample_sites')
-
+    station_results_directory = config_file.get('json_settings', 'station_results_directory')
 
   except ConfigParser.Error, e:
     if logger:
       logger.exception(e)
   else:
-    fl_sites = florida_sample_sites(True)
-    fl_sites.load_sites(file_name=sites_location_file, boundary_file=boundaries_location_file)
-
-    wb = load_workbook(filename = xl_file_name)
-    bacteria_data_sheet = wb['SCHD Bact Results']
-    date_column = 'A'
-    time_column = 'B'
-    station_column = 'D'
-    entero_column = 'H'
     features = []
     #Let's go site by site and find the data in the worksheet. Currently we only get the
     #data for Sarasota county.
     for site in fl_sites:
       if logger:
-        logger.debug("Site: %s Desc: %s searching worsheet" % (site.name, site.description))
-      for row_num in range(2,18):
-        cell_name = "%s%d" % (station_column, row_num)
-        cell_value = "%s%d" % (entero_column, row_num)
-        cell_date = "%s%d" % (date_column, row_num)
-        cell_time = "%s%d" % (time_column, row_num)
-        if bacteria_data_sheet[cell_name].value.strip().lower() == site.description.lower():
-          if logger:
-            logger.debug("Adding feature site: %s Desc: %s" % (site.name, site.description))
-          #Build the json structure the web app is going to use.
-          sample_date_time = datetime.combine(bacteria_data_sheet[cell_date].value, bacteria_data_sheet[cell_time].value)
-          features.append({
+        logger.debug("Site: %s Desc: %s searching data" % (site.name, site.description))
+
+      if site.description.lower() in bacteria_data:
+        if logger:
+          logger.debug("Adding feature site: %s Desc: %s" % (site.name, site.description))
+        #Build the json structure the web app is going to use.
+        station_data = bacteria_data[site.description.lower()]
+        if isinstance(station_data['value'], int):
+          values = station_data['value']
+        else:
+          values = station_data['value'].split(';')
+          values = [int(val.strip()) for val in values]
+        feature = {
+          'type': 'Feature',
+          'geometry': {
+            'type': 'Point',
+            'coordinates': [site.object_geometry.x, site.object_geometry.y]
+          },
+          'properties' : {
+            'locale': site.description,
+            'sign': False,
+            'station': site.name,
+            'epaid': site.epa_id,
+            'beach': site.county,
+            'desc': site.description,
+            'len': '',
+            'test': {
+              'beachadvisories': {
+                'date': station_data['sample_date'].strftime('%Y-%m-%d %H:%M:%S'),
+                'station': site.name,
+                'value': values
+              }
+            }
+          }
+        }
+        features.append(feature)
+
+    try:
+      with open(advisory_results_filename, "w") as json_out_file:
+        #Now output JSON file.
+        json_data = {
+          'type': 'FeatureCollection',
+          'features': features
+        }
+        json_out_file.write(json.dumps(json_data, sort_keys=True))
+    except (json.JSONDecodeError, IOError) as e:
+      if logger:
+        logger.exception(e)
+
+  if logger:
+    logger.debug("Finished build_predictions_file")
+
+  return
+
+def build_station_file(bacteria_data, config_file, fl_sites, use_logging):
+  logger = None
+  if use_logging:
+    logger = logging.getLogger('build_station_file_logger')
+    logger.debug("Starting build_station_file")
+
+  try:
+    station_results_directory = config_file.get('json_settings', 'station_results_directory')
+
+  except ConfigParser.Error, e:
+    if logger:
+      logger.exception(e)
+  else:
+    for site in fl_sites:
+      if site.description.lower() in bacteria_data:
+        if logger:
+          logger.debug("Station: %s building file." % (site.name))
+
+        station_data = bacteria_data[site.description.lower()]
+
+        #Now find if we have the station file already, if not we create it.
+        station_filename = os.path.join(station_results_directory, '%s.json' % (site.name))
+        feature = None
+        if isinstance(station_data['value'], int):
+          values = station_data['value']
+        else:
+          values = station_data['value'].split(';')
+          values = [int(val.strip()) for val in values]
+
+        test_data = {
+          'date': station_data['sample_date'].strftime('%Y-%m-%d %H:%M:%S'),
+          'station': site.name,
+          'value': values
+        }
+        #Do we have a station file already, if so get the data.
+        if os.path.isfile(station_filename):
+          try:
+            with open(station_filename, 'r') as station_json_file:
+              feature = json.loads(station_json_file.read())
+              beachadvisories = feature['properties']['test']['beachadvisories']
+              #Make sure the date is not already in the list.
+              if not contains(beachadvisories, lambda x: x['date'] == test_data['date']):
+                if logger:
+                  logger.debug("Station: %s adding date: %s" % (site.name, test_data['date']))
+                beachadvisories.append(test_data)
+                beachadvisories.sort(key=lambda x: x['date'], reverse=True)
+          except (json.JSONDecodeError, IOError) as e:
+            if logger:
+              logger.exception(e)
+        #No file, so let's create the station data
+        else:
+          feature = {
             'type': 'Feature',
             'geometry': {
               'type': 'Point',
@@ -139,30 +260,21 @@ def parse_sheet_data(xl_file_name, config_file, use_logging):
               'epaid': site.epa_id,
               'beach': site.county,
               'desc': site.description,
+              'len': '',
               'test': {
-                'beachadvisories': {
-                  'date': sample_date_time.strftime('%Y-%m-%d %H:%M:%S'),
-                  'station': site.name,
-                  'value': float(bacteria_data_sheet[cell_value].value)
-                }
+                'beachadvisories': [test_data]
               }
             }
+          }
+      try:
+        with open(station_filename, 'w') as station_json_file:
+          station_json_file.write(json.dumps(feature))
+      except (json.JSONDecodeError, IOError) as e:
+        if logger:
+          logger.exception(e)
 
-          })
-          break
-    try:
-      with open(advisory_results_filename, "w") as json_out_file:
-        #Now output JSON file.
-        json_data = {
-          'type': 'FeatureCollection',
-          'features': features
-        }
-        json_out_file.write(json.dumps(json_data, sort_keys=True))
-    except (json.JSONDecodeError, IOError) as e:
-      if logger:
-        logger.exception(e)
-    if logger:
-      logger.debug("Finished parse_sheet_data")
+  if logger:
+    logger.debug("Finished build_station_file")
 
   return
 
@@ -186,7 +298,11 @@ def main():
     logger = None
     use_logging = False
     try:
+
       logConfFile = config_file.get('logging', 'config_file')
+      boundaries_location_file = config_file.get('boundaries_settings', 'boundaries_file')
+      sites_location_file = config_file.get('boundaries_settings', 'sample_sites')
+
       if logConfFile:
         logging.config.fileConfig(logConfFile)
         logger = logging.getLogger('florida_wq_bact_harvest_logger')
@@ -196,7 +312,15 @@ def main():
       if logger:
         logger.exception(e)
     else:
-      check_email_for_update(config_file, use_logging)
+      data_file_list = check_email_for_update(config_file, use_logging)
+      if len(data_file_list):
+        fl_sites = florida_sample_sites(True)
+        fl_sites.load_sites(file_name=sites_location_file, boundary_file=boundaries_location_file)
+
+        for data_file in data_file_list:
+          sample_data = parse_sheet_data(data_file, use_logging)
+          build_predictions_file(sample_data, config_file, fl_sites, use_logging)
+          build_station_file(sample_data, config_file, fl_sites, use_logging)
 
 
   return
