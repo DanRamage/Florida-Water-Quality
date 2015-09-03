@@ -17,7 +17,7 @@ from enterococcus_wq_test import EnterococcusPredictionTest
 
 from florida_wq_data import florida_wq_model_data, florida_sample_sites
 from wq_results import _resolve, results_exporter
-
+from stats import stats
 
 def build_test_objects(config_file, site_name, use_logging):
   logger = None
@@ -114,7 +114,6 @@ def run_wq_models(**kwargs):
         model_list = build_test_objects(config_file, site.name, kwargs['use_logging'])
         #Create the container for all the models.
         site_equations = wqEquations(site.name, model_list, True)
-        site_model_ensemble.append((site, site_equations))
 
         #Get the station specific tide stations
         tide_station = config_file.get(site.name, 'tide_station')
@@ -144,6 +143,20 @@ def run_wq_models(**kwargs):
           if logger:
             logger.debug("Site: %s total time to execute models: %f ms" % (site.name, total_test_time * 1000))
           total_time += total_test_time
+          #Calculate some statistics on the entero results. This is making an assumption
+          #that all the tests we are running are calculating the same value, the entero
+          #amount.
+          entero_stats = None
+          if len(site_equations.tests):
+            entero_stats = stats()
+            [entero_stats.addValue(test.mlrResult) for test in site_equations.tests]
+            entero_stats.doCalculations()
+
+          site_model_ensemble.append({'metadata': site,
+                                      'models': site_equations,
+                                      'statistics': entero_stats})
+
+
         except Exception,e:
           if logger:
             logger.exception(e)
