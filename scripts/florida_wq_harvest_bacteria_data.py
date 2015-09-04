@@ -105,6 +105,7 @@ def parse_sheet_data(xl_file_name, use_logging):
   time_column = 'B'
   station_column = 'D'
   entero_column = 'H'
+  sample_date = None
   for row_num in range(2,18):
     cell_name = "%s%d" % (station_column, row_num)
     cell_value = "%s%d" % (entero_column, row_num)
@@ -118,12 +119,14 @@ def parse_sheet_data(xl_file_name, use_logging):
       'sample_date': sample_date_time,
       'value': bacteria_data_sheet[cell_value].value
     }
+    if sample_date is None:
+      sample_date = bacteria_data_sheet[cell_date].value
   if logger:
     logger.debug("Finished parse_sheet_data")
 
-  return sample_data
+  return sample_data, sample_date
 
-def build_predictions_file(bacteria_data, config_file, fl_sites, use_logging):
+def build_current_file(bacteria_data, config_file, fl_sites, use_logging):
   logger = None
   if use_logging:
     logger = logging.getLogger('build_predictions_file_logger')
@@ -282,6 +285,10 @@ def main():
   parser = optparse.OptionParser()
   parser.add_option("-c", "--ConfigFile", dest="config_file", default=None,
                     help="INI Configuration file." )
+  parser.add_option("-s", "--CreateCurrentSampleFile", dest="create_current", default=False,
+                    help="If set, this will create the current the stations json file with the latest data.")
+  parser.add_option("-i", "--CreateStationsFile", dest="create_stations", default=False,
+                    help="If set, this will create or update the individual station json file with the data from latest email.")
 
   (options, args) = parser.parse_args()
 
@@ -317,11 +324,18 @@ def main():
         fl_sites = florida_sample_sites(True)
         fl_sites.load_sites(file_name=sites_location_file, boundary_file=boundaries_location_file)
 
+        data_dict = {}
         for data_file in data_file_list:
-          sample_data = parse_sheet_data(data_file, use_logging)
-          build_predictions_file(sample_data, config_file, fl_sites, use_logging)
-          build_station_file(sample_data, config_file, fl_sites, use_logging)
+          sample_data, sample_date = parse_sheet_data(data_file, use_logging)
+          data_dict[sample_date] = sample_data
 
+        date_keys = data_dict.keys()
+        date_keys.sort()
+        #Build the individual station json files.
+        for date_key in date_keys:
+          build_station_file(data_dict[date_key], config_file, fl_sites, use_logging)
+        #Build the most current results for all the stations.
+        build_current_file(data_dict[date_keys[-1]], config_file, fl_sites, use_logging)
 
   return
 

@@ -28,6 +28,8 @@ def build_test_objects(config_file, site_name, use_logging):
   #Get the sites test configuration ini, then build the test objects.
   try:
     test_config_file = config_file.get(site_name, 'prediction_config')
+    entero_lo_limit = config_file.getint('entero_limits', 'limit_lo')
+    entero_hi_limit = config_file.getint('entero_limits', 'limit_hi')
   except ConfigParser.Error, e:
     if logger:
       logger.exception(e)
@@ -49,6 +51,7 @@ def build_test_objects(config_file, site_name, use_logging):
         logger.debug("Site: %s Model name: %s equation: %s" % (site_name, model_name, model_equation))
 
       test_obj = EnterococcusPredictionTest(model_equation, site_name, model_name)
+      test_obj.set_category_limits(entero_lo_limit, entero_hi_limit)
       model_list.append(test_obj)
 
   return model_list
