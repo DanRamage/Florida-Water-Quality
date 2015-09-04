@@ -85,10 +85,10 @@ def main():
           model_config_parser.add_section("settings")
           with open(model_csv_file, "rU") as model_file_obj:
             model_file_reader = csv.DictReader(model_file_obj, delimiter=',', quotechar='"', fieldnames=header_row)
-            line_num = 0
+            line_num = 1
             for row in model_file_reader:
               #Actually model lines start multiple lines into the file.
-              if line_num > start_line:
+              if line_num >= start_line:
                 model_section = "model_%d" % (model_count+1)
                 model_config_parser.add_section(model_section)
                 model_config_parser.set(model_section, 'name', row['Option'])

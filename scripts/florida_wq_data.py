@@ -37,6 +37,14 @@ def find_ge(a, x):
     if i != len(a):
         return i
     raise ValueError
+
+class florida_wq_site(station_geometry):
+  def __init__(self, **kwargs):
+    station_geometry.__init__(self, kwargs['name'], kwargs['wkt'])
+    self.epa_id = kwargs['epa_id']
+    self.description = kwargs['description']
+    self.county = kwargs['county']
+    return
 """
 florida_sample_sites
 Overrides the default sampling_sites object so we can load the sites from the florida data.
@@ -63,7 +71,7 @@ class florida_sample_sites(sampling_sites):
         fl_boundaries.load(kwargs['boundary_file'])
 
       try:
-        header_row = ["WKT","EPAbeachID","SPLocation","Boundary"]
+        header_row = ["WKT","EPAbeachID","SPLocation","Description","County","Boundary"]
         if self.logger:
           self.logger.debug("Reading sample sites file: %s" % (kwargs['file_name']))
 
@@ -81,7 +89,18 @@ class florida_sample_sites(sampling_sites):
             station = self.get_site(row['SPLocation'])
             if station is None:
               add_site = True
-              station = station_geometry(row['SPLocation'], row['WKT'])
+              """
+              station_geometry.__init__(self, kwargs['name'], kwargs['wkt'])
+              self.epa_id = kwargs['epa_id']
+              self.description = kwargs['description']
+              self.county = kwargs['county']
+
+              """
+              station = florida_wq_site(name=row['SPLocation'],
+                                        wkt=row['WKT'],
+                                        epa_id=row['EPAbeachID'],
+                                        description=row['Description'],
+                                        county=row['County'])
               self.append(station)
 
               boundaries =  row['Boundary'].split(',')
@@ -825,13 +844,6 @@ class florida_wq_model_data(florida_wq_historical_data):
       self.logger.debug("Creating and initializing data dict.")
 
     if not initialize_site_specific_data_only:
-      #Build variables for the base tide station.
-      var_name = 'tide_range_%s' % (self.tide_station)
-      wq_tests_data[var_name] = wq_defines.NO_DATA
-      var_name = 'tide_hi_%s' % (self.tide_station)
-      wq_tests_data[var_name] = wq_defines.NO_DATA
-      var_name = 'tide_lo_%s' % (self.tide_station)
-      wq_tests_data[var_name] = wq_defines.NO_DATA
 
       wq_tests_data['nws_ksrq_avg_wspd'] = wq_defines.NO_DATA
       wq_tests_data['nws_ksrq_avg_wdir'] = wq_defines.NO_DATA
@@ -845,13 +857,20 @@ class florida_wq_model_data(florida_wq_historical_data):
       wq_tests_data['c10_min_water_temp'] = wq_defines.NO_DATA
       wq_tests_data['c10_max_water_temp'] = wq_defines.NO_DATA
 
-      #Build variables for the subordinate tide station.
-      var_name = 'tide_range_%s' % (self.tide_offset_settings['tide_station'])
-      wq_tests_data[var_name] = wq_defines.NO_DATA
-      var_name = 'tide_hi_%s' % (self.tide_offset_settings['tide_station'])
-      wq_tests_data[var_name] = wq_defines.NO_DATA
-      var_name = 'tide_lo_%s' % (self.tide_offset_settings['tide_station'])
-      wq_tests_data[var_name] = wq_defines.NO_DATA
+    #Build variables for the base tide station.
+    var_name = 'tide_range_%s' % (self.tide_station)
+    wq_tests_data[var_name] = wq_defines.NO_DATA
+    var_name = 'tide_hi_%s' % (self.tide_station)
+    wq_tests_data[var_name] = wq_defines.NO_DATA
+    var_name = 'tide_lo_%s' % (self.tide_station)
+    wq_tests_data[var_name] = wq_defines.NO_DATA
+    #Build variables for the subordinate tide station.
+    var_name = 'tide_range_%s' % (self.tide_offset_settings['tide_station'])
+    wq_tests_data[var_name] = wq_defines.NO_DATA
+    var_name = 'tide_hi_%s' % (self.tide_offset_settings['tide_station'])
+    wq_tests_data[var_name] = wq_defines.NO_DATA
+    var_name = 'tide_lo_%s' % (self.tide_offset_settings['tide_station'])
+    wq_tests_data[var_name] = wq_defines.NO_DATA
 
     for boundary in self.site.contained_by:
       if len(boundary.name):
@@ -905,10 +924,10 @@ class florida_wq_model_data(florida_wq_historical_data):
 
     #If we are resetting only the site specific data, no need to re-query these.
     if not reset_site_specific_data_only:
-      self.get_tide_data(start_date, wq_tests_data)
       self.get_nws_data(start_date, wq_tests_data)
       self.get_c10_data(start_date, wq_tests_data)
 
+    self.get_tide_data(start_date, wq_tests_data)
     self.get_nexrad_data(start_date, wq_tests_data)
     self.get_hycom_model_data(start_date, wq_tests_data)
 
@@ -1016,14 +1035,14 @@ class florida_wq_model_data(florida_wq_historical_data):
           .filter(multi_obs.sensor_id == wind_spd_sensor_id)\
           .filter(multi_obs.m_date >= begin_date)\
           .filter(multi_obs.m_date < end_date)\
-          .order_by(multi_obs.m_date)
+          .order_by(multi_obs.m_date).all()
 
         wind_dir_data = self.xenia_obs_db.session.query(multi_obs)\
           .filter(multi_obs.platform_handle.ilike(platform_handle))\
           .filter(multi_obs.sensor_id == wind_dir_sensor_id)\
           .filter(multi_obs.m_date >= begin_date)\
           .filter(multi_obs.m_date < end_date)\
-          .order_by(multi_obs.m_date)
+          .order_by(multi_obs.m_date).all()
       except Exception, e:
         if self.logger:
           self.logger.exception(e)
