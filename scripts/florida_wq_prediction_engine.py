@@ -152,7 +152,9 @@ def run_wq_models(**kwargs):
           entero_stats = None
           if len(site_equations.tests):
             entero_stats = stats()
-            [entero_stats.addValue(test.mlrResult) for test in site_equations.tests]
+            for test in site_equations.tests:
+              if test.mlrResult is not None:
+                entero_stats.addValue(test.mlrResult)
             entero_stats.doCalculations()
 
           site_model_ensemble.append({'metadata': site,
@@ -199,7 +201,7 @@ def main():
   parser = optparse.OptionParser()
   parser.add_option("-c", "--ConfigFile", dest="config_file",
                     help="INI Configuration file." )
-  parser.add_option("-s", "--StartDateTime", dest="startDateTime",
+  parser.add_option("-s", "--StartDateTime", dest="start_date_time",
                     help="A date to re-run the predictions for, if not provided, the default is the current day. Format is YYYY-MM-DD HH:MM:SS." )
 
   (options, args) = parser.parse_args()
@@ -225,15 +227,20 @@ def main():
     traceback.print_exc(e)
     sys.exit(-1)
   else:
-    if(options.startDateTime != None):
+    dates_to_process = []
+    if options.start_date_time is not None:
+      #Can be multiple dates, so let's split on ','
+      collection_date_list = options.start_date_time.split(',')
       #We are going to process the previous day, so we get the current date, set the time to midnight, then convert
       #to UTC.
       eastern = timezone('US/Eastern')
-      est = eastern.localize(datetime.strptime(options.startDateTime, "%Y-%m-%dT%H:%M:%S"))
-      #est = est - timedelta(days=1)
-      #Convert to UTC
-      begin_date = est.astimezone(timezone('UTC'))
-      end_date = begin_date + timedelta(hours=24)
+      for collection_date in collection_date_list:
+        est = eastern.localize(datetime.strptime(collection_date, "%Y-%m-%dT%H:%M:%S"))
+        #est = est - timedelta(days=1)
+        #Convert to UTC
+        begin_date = est.astimezone(timezone('UTC'))
+        dates_to_process.append(begin_date)
+        #end_date = begin_date + timedelta(hours=24)
     else:
       #We are going to process the previous day, so we get the current date, set the time to midnight, then convert
       #to UTC.
@@ -241,11 +248,13 @@ def main():
       est = est.replace(hour=0, minute=0, second=0,microsecond=0)
       #Convert to UTC
       begin_date = est.astimezone(timezone('UTC'))
+      dates_to_process.append(begin_date)
 
     try:
-      run_wq_models(begin_date=begin_date,
-                    config_file_name=options.config_file,
-                    use_logging=use_logging)
+      for process_date in dates_to_process:
+        run_wq_models(begin_date=process_date,
+                      config_file_name=options.config_file,
+                      use_logging=use_logging)
     except Exception, e:
       logger.exception(e)
 

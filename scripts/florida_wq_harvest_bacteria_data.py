@@ -323,7 +323,6 @@ def main():
       if len(data_file_list):
         fl_sites = florida_sample_sites(True)
         fl_sites.load_sites(file_name=sites_location_file, boundary_file=boundaries_location_file)
-
         data_dict = {}
         for data_file in data_file_list:
           sample_data, sample_date = parse_sheet_data(data_file, use_logging)
@@ -336,7 +335,6 @@ def main():
           build_station_file(data_dict[date_key], config_file, fl_sites, use_logging)
         #Build the most current results for all the stations.
         build_current_file(data_dict[date_keys[-1]], config_file, fl_sites, use_logging)
-
   return
 
 
