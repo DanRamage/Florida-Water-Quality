@@ -25,26 +25,40 @@
                       <h2>Site: ${site_data['metadata'].name}</h2>
                     </div>
                 </div>
-                <div class="row">
-                    % if site_data['statistics'] is not None:
-                    <table class="table table-bordered">
-                        <tr>
-                            <th>Minimum Entero</th>
-                            <th>Maximum Entero</th>
-                            <th>Average Entero</th>
-                            <th>Median Entero</th>
-                            <th>StdDev Entero</th>
-                        </tr>
-                        <tr>
-                          <td>${"%.2f" % (site_data['statistics'].minVal)}</td>
-                          <td>${"%.2f" % (site_data['statistics'].maxVal)}</td>
-                          <td>${"%.2f" % (site_data['statistics'].average)}</td>
-                          <td>${"%.2f" % (site_data['statistics'].median)}</td>
-                          <td>${"%.2f" % (site_data['statistics'].stdDev)}</td>
-                        </tr>
-                    </table>
-                    % endif
-                </div>
+                % if site_data['entero_value'] is not None:
+                    <div class="row">
+                        <table class="table table-bordered">
+                            <tr>
+                                <th> Site Sampled Entero Value </th>
+                            </tr>
+                            <tr>
+                                <td>
+                                    ${"%.2f" % (site_data['entero_value'])}
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                % endif
+                % if site_data['statistics'] is not None:
+                    <div class="row">
+                        <table class="table table-bordered">
+                            <tr>
+                                <th>Minimum Entero</th>
+                                <th>Maximum Entero</th>
+                                <th>Average Entero</th>
+                                <th>Median Entero</th>
+                                <th>StdDev Entero</th>
+                            </tr>
+                            <tr>
+                              <td>${"%.2f" % (site_data['statistics'].minVal)}</td>
+                              <td>${"%.2f" % (site_data['statistics'].maxVal)}</td>
+                              <td>${"%.2f" % (site_data['statistics'].average)}</td>
+                              <td>${"%.2f" % (site_data['statistics'].median)}</td>
+                              <td>${"%.2f" % (site_data['statistics'].stdDev)}</td>
+                            </tr>
+                        </table>
+                    </div>
+                % endif
                 <div class="row">
                     <table class="table table-bordered">
                         <tr>
