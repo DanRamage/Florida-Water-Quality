@@ -1,3 +1,8 @@
-WKT,EPAbeachID,SPLocation,Boundary
-"POINT (-82.69023195 27.43570863)",FL553328,Broadway Beach Access (F.K.A. WHITNEY BEACH),"Sarasota Bay,Longboat Key"
+WKT,EPAbeachID,SPLocation,Description,Country,Boundary
+"POINT (-82.562441 27.32682)",FL209722,"RINGLING CAUSEWAY","Bird Key Park/Ringling",Sarasota,"Sarasota Bay"
+"POINT (-82.58171117 27.31560763)",FL464579,NORTH LIDO BEACH,North Lido Beach,Sarasota,"Sarasota Bay,Lido Key"
+"POINT (-82.5771785 27.31100082)",FL363707,LIDO CASINO BEACH,Lido Beach (Casino),Sarasota,"Sarasota Bay,Lido Key"
+"POINT (-82.56739008 27.2981831)",FL159008,SOUTH LIDO BEACH,South Lido Park,Sarasota,"Sarasota Bay,Lido Key"
+"POINT (-82.63202183 27.37315228)",FL596960,LONGBOAT KEY ACCESS,Longboat Key Beach Access,Sarasota,"Sarasota Bay,Longboat Key"
+"POINT (-82.69023195 27.43570863)",FL553328,"Broadway Beach Access (F.K.A. WHITNEY BEACH)",,Manatee,"Sarasota Bay,Longboat Key"
 
