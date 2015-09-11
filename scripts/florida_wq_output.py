@@ -15,6 +15,7 @@ class email_wq_results(wq_results):
                user_and_password,
                results_template,
                results_outfile,
+               report_url,
                use_logging):
 
     wq_results.__init__(self, use_logging)
@@ -27,6 +28,7 @@ class email_wq_results(wq_results):
     self.password = user_and_password[1]
     self.result_outfile = results_outfile
     self.results_template = results_template
+    self.report_url = report_url
 
   def emit(self, record):
     if self.logger:
@@ -36,11 +38,14 @@ class email_wq_results(wq_results):
       file_ext = os.path.splitext(self.result_outfile)
       file_parts = os.path.split(file_ext[0])
       #Add the prediction date into the filename
-      out_filename = os.path.join(file_parts[0], '%s-%s%s' % (file_parts[1], record['prediction_date'].replace(':', '_').replace(' ', '-'), file_ext[1]))
+      file_name = "%s-%s%s" % (file_parts[1], record['prediction_date'].replace(':', '_').replace(' ', '-'), file_ext[1])
+      out_filename = os.path.join(file_parts[0], file_name)
       with open(out_filename, 'w') as report_out_file:
+        report_url = '%s/%s' % (self.report_url, file_name)
         results_report = mytemplate.render(ensemble_tests=record['ensemble_tests'],
                                                 prediction_date=record['prediction_date'],
-                                                execution_date=record['execution_date'])
+                                                execution_date=record['execution_date'],
+                                                report_url=report_url)
         report_out_file.write(results_report)
     except TypeError,e:
       if self.logger:
