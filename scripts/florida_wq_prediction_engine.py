@@ -87,7 +87,6 @@ def check_site_date_for_sampling_date(site_name, test_date, config_file, use_log
       logger.exception(e)
   else:
     station_bacteria_filename = os.path.join(station_results_directory, '%s.json' % (site_name))
-    station_json_data = None
     try:
       with open(station_bacteria_filename, 'r') as station_bacteria_json_file:
         station_json_data = json.loads(station_bacteria_json_file.read())
@@ -213,8 +212,11 @@ def run_wq_models(**kwargs):
                 entero_stats.addValue(test.mlrResult)
             entero_stats.doCalculations()
 
-          #Check to see if there is a entero sample for our date.
-          entero_value = check_site_date_for_sampling_date(site.name, kwargs['begin_date'], config_file, kwargs['use_logging'])
+          #Check to see if there is a entero sample for our date as long as the date
+          #is not the current date.
+          entero_value = None
+          if datetime.now().date() != kwargs['begin_date'].date():
+            entero_value = check_site_date_for_sampling_date(site.name, kwargs['begin_date'], config_file, kwargs['use_logging'])
 
           site_model_ensemble.append({'metadata': site,
                                       'models': site_equations,
