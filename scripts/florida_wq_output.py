@@ -2,9 +2,9 @@ from wq_results import wq_results, _resolve
 from mako.template import Template
 from mako import exceptions as makoExceptions
 from datetime import datetime
-from pytz import timezone
 import simplejson as json
 from smtp_utils import smtpClass
+import os
 
 class email_wq_results(wq_results):
   def __init__(self,
@@ -33,8 +33,11 @@ class email_wq_results(wq_results):
       self.logger.debug("Starting emit for email output.")
     try:
       mytemplate = Template(filename=self.results_template)
-
-      with open(self.result_outfile, 'w') as report_out_file:
+      file_ext = os.path.splitext(self.result_outfile)
+      file_parts = os.path.split(file_ext[0])
+      #Add the prediction date into the filename
+      out_filename = os.path.join(file_parts[0], '%s-%s%s' % (file_parts[1], record['prediction_date'].replace(':', '_').replace(' ', '-'), file_ext[1]))
+      with open(out_filename, 'w') as report_out_file:
         results_report = mytemplate.render(ensemble_tests=record['ensemble_tests'],
                                                 prediction_date=record['prediction_date'],
                                                 execution_date=record['execution_date'])
@@ -76,7 +79,10 @@ class json_wq_results(wq_results):
         station_data = {'features' : [],
                         'type': 'FeatureCollection'}
         features = []
-        for site_metadata, test_results in ensemble_data:
+        for rec in ensemble_data:
+          site_metadata = rec['metadata']
+          test_results = rec['models']
+          stats = rec['statistics']
           test_data = []
           for test in test_results.tests:
             test_data.append({

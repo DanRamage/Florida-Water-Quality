@@ -143,8 +143,6 @@ class EnterococcusPredictionTest(predictionTest):
     if self.logger:
       self.logger.debug("runTest start Site: %s model name: %s formula: %s" % (self.name, self.model_name, self.formula))
 
-    if self.model_name == 'Option A best variables transformed':
-      i = 0
     start_time = time.time()
     try:
       #Get the variables from the formula, then verify the passed in data has the observation and a valid value.
@@ -166,8 +164,12 @@ class EnterococcusPredictionTest(predictionTest):
         self.log10MLRResult = sym_expr.evalf(subs=mlr_symbols)
         if self.logger:
           self.logger.debug("Model: %s Result: %f Data Used: %s" % (self.model_name, self.log10MLRResult, self.data_used))
-        self.mlrResult = pow(10,self.log10MLRResult)
-        self.categorize_result()
+        try:
+          self.mlrResult = pow(10,self.log10MLRResult)
+          self.categorize_result()
+        except OverflowError,e:
+          if self.logger:
+            self.logger.exception(e)
       else:
         if self.logger:
           self.logger.debug("Model: %s test not performed, one of more invalid data points: %s" % (self.model_name, self.data_used))

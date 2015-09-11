@@ -770,6 +770,7 @@ class florida_wq_model_data(florida_wq_historical_data):
     #These are the settings to correct the tide for the subordinate station.
     self.tide_offset_settings =  None
     self.tide_data_obj = None
+    self.query_tide_data = True
 
     if self.logger:
       self.logger.debug("Connecting to thredds endpoint for c10: %s" % (kwargs['c_10_tds_url']))
@@ -779,7 +780,9 @@ class florida_wq_model_data(florida_wq_historical_data):
     self.c10_times = self.ncObj.variables[kwargs['c_10_time_var']][:]
 
     self.c10_water_temp = self.ncObj.variables[kwargs['c_10_water_temp_var']][:]
+    self.c10_water_temp_fill_value = self.ncObj.variables[kwargs['c_10_water_temp_var']]._FillValue
     self.c10_salinity = self.ncObj.variables[kwargs['c_10_salinity_var']][:]
+    self.c10_salinity_fill_value = self.ncObj.variables[kwargs['c_10_salinity_var']]._FillValue
 
     self.model_bbox = kwargs['model_bbox']
     self.model_within_polygon = Polygon(kwargs['model_within_polygon'])
@@ -829,6 +832,7 @@ class florida_wq_model_data(florida_wq_historical_data):
     if self.logger:
       self.logger.debug("Disconnecting xenia obs database.")
     self.xenia_obs_db.disconnect()
+
 
   """
   Function: initialize_return_data
@@ -975,17 +979,22 @@ class florida_wq_model_data(florida_wq_historical_data):
             c10_salinity = self.c10_salinity[closest_start_ndx:closest_end_ndx]
 
             #Only calc average on real values, ignore NaNs.
-            c10_no_nan_salinity = c10_salinity[~np.isnan(c10_salinity)]
+            #c10_no_nan_salinity = c10_salinity[~c10_salinity.mask]
+            c10_no_nan_salinity = c10_salinity[(c10_salinity > int(self.c10_salinity_fill_value))]
+            c10_no_nan_salinity = c10_no_nan_salinity[~np.isnan(c10_no_nan_salinity)]
             if len(c10_no_nan_salinity):
               wq_tests_data['c10_avg_salinity_%d' % (prev_hour)] = float(np.average(c10_no_nan_salinity))
               wq_tests_data['c10_min_salinity_%d' % (prev_hour)] = float(c10_no_nan_salinity.min())
               wq_tests_data['c10_max_salinity_%d' % (prev_hour)] = float(c10_no_nan_salinity.max())
             #Only get the 24 hour average of water temp
             if prev_hour == 24:
-              #Only calc average on real values, ignore NaNs.
+              #Only calc average on real values, mask out the fill values and  NaNs.
               c10_water_temp = self.c10_water_temp[closest_start_ndx:closest_end_ndx]
 
-              c10_no_nan_water_temp = c10_water_temp[~np.isnan(c10_water_temp)]
+              #c10_no_nan_water_temp = c10_water_temp[~c10_water_temp.mask]
+
+              c10_no_nan_water_temp = c10_water_temp[(c10_water_temp > int(self.c10_water_temp_fill_value))]
+              c10_no_nan_water_temp = c10_no_nan_water_temp[~np.isnan(c10_no_nan_water_temp)]
               if len(c10_no_nan_water_temp):
                 wq_tests_data['c10_avg_water_temp_24'] = float(np.average(c10_no_nan_water_temp))
                 wq_tests_data['c10_min_water_temp'] = float(c10_no_nan_water_temp.min())
@@ -1031,15 +1040,15 @@ class florida_wq_model_data(florida_wq_historical_data):
       begin_date = start_date - timedelta(hours=24)
       try:
         wind_speed_data = self.xenia_obs_db.session.query(multi_obs)\
-          .filter(multi_obs.platform_handle.ilike(platform_handle))\
           .filter(multi_obs.sensor_id == wind_spd_sensor_id)\
+          .filter(multi_obs.platform_handle.ilike(platform_handle))\
           .filter(multi_obs.m_date >= begin_date)\
           .filter(multi_obs.m_date < end_date)\
           .order_by(multi_obs.m_date).all()
 
         wind_dir_data = self.xenia_obs_db.session.query(multi_obs)\
-          .filter(multi_obs.platform_handle.ilike(platform_handle))\
           .filter(multi_obs.sensor_id == wind_dir_sensor_id)\
+          .filter(multi_obs.platform_handle.ilike(platform_handle))\
           .filter(multi_obs.m_date >= begin_date)\
           .filter(multi_obs.m_date < end_date)\
           .order_by(multi_obs.m_date).all()

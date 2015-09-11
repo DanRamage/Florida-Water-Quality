@@ -1,5 +1,6 @@
 import sys
 sys.path.append('../commonfiles')
+import os
 
 import logging.config
 from datetime import datetime, timedelta
@@ -11,6 +12,7 @@ import ConfigParser
 from collections import OrderedDict
 from mako.template import Template
 from mako import exceptions as makoExceptions
+import simplejson as json
 
 from wq_prediction_tests import wqEquations
 from enterococcus_wq_test import EnterococcusPredictionTest
@@ -18,7 +20,16 @@ from enterococcus_wq_test import EnterococcusPredictionTest
 from florida_wq_data import florida_wq_model_data, florida_sample_sites
 from wq_results import _resolve, results_exporter
 from stats import stats
-
+'''
+Function: build_test_objects
+Purpose: Builds the models used for doing the predictions.
+Parameters:
+  config_file - ConfigParser object
+  site_name - The name of the site whose models we are building.
+  use_logging - Flag to specify if we are to use logging.
+Return:
+  A list of models constructed.
+'''
 def build_test_objects(config_file, site_name, use_logging):
   logger = None
   if use_logging:
@@ -28,6 +39,8 @@ def build_test_objects(config_file, site_name, use_logging):
   #Get the sites test configuration ini, then build the test objects.
   try:
     test_config_file = config_file.get(site_name, 'prediction_config')
+    entero_lo_limit = config_file.getint('entero_limits', 'limit_lo')
+    entero_hi_limit = config_file.getint('entero_limits', 'limit_hi')
   except ConfigParser.Error, e:
     if logger:
       logger.exception(e)
@@ -49,9 +62,53 @@ def build_test_objects(config_file, site_name, use_logging):
         logger.debug("Site: %s Model name: %s equation: %s" % (site_name, model_name, model_equation))
 
       test_obj = EnterococcusPredictionTest(model_equation, site_name, model_name)
+      test_obj.set_category_limits(entero_lo_limit, entero_hi_limit)
       model_list.append(test_obj)
 
   return model_list
+
+'''
+Function: check_site_date_for_sampling_date
+Purpose: For the given site, we check the stations bacteria samples to see
+ if there is a field sample that occured as well. If so, we return it.
+Return:
+  Entero value if found, otherwise None.
+'''
+def check_site_date_for_sampling_date(site_name, test_date, config_file, use_logging):
+  entero_value = None
+  logger = None
+  if use_logging:
+    logger = logging.getLogger('check_site_date_for_sampling_date_logger')
+    logger.debug("Starting check_site_date_for_sampling_date. Site: %s Date: %s" % (site_name, test_date))
+  try:
+    station_results_directory = config_file.get('output', 'station_results_directory')
+  except ConfigParser.Error, e:
+    if logger:
+      logger.exception(e)
+  else:
+    station_bacteria_filename = os.path.join(station_results_directory, '%s.json' % (site_name))
+    try:
+      with open(station_bacteria_filename, 'r') as station_bacteria_json_file:
+        station_json_data = json.loads(station_bacteria_json_file.read())
+      if station_json_data is not None:
+        properties = station_json_data['properties']
+        test_results = properties['test']
+        for result in test_results['beachadvisories']:
+          result_date = timezone('UTC').localize(datetime.strptime(result['date'], '%Y-%m-%d %H:%M:%S'))
+          if result_date.date() == test_date.date():
+            if not isinstance(result['value'], list):
+              entero_value = result['value']
+            else:
+              entero_value = result['value'][0]
+            break
+    except IOError, e:
+      if logger:
+        logger.exception(e)
+
+  if logger:
+    logger.debug("Finished check_site_date_for_sampling_date. Site: %s Date: %s" % (site_name, test_date))
+
+  return entero_value
 
 def run_wq_models(**kwargs):
   logger = None
@@ -78,6 +135,7 @@ def run_wq_models(**kwargs):
     xenia_obs_db_user = config_file.get('xenia_observation_database', 'user')
     xenia_obs_db_password = config_file.get('xenia_observation_database', 'password')
     xenia_obs_db_name = config_file.get('xenia_observation_database', 'database')
+
   except ConfigParser.Error, e:
     if logger:
       logger.exception(e)
@@ -149,17 +207,25 @@ def run_wq_models(**kwargs):
           entero_stats = None
           if len(site_equations.tests):
             entero_stats = stats()
-            [entero_stats.addValue(test.mlrResult) for test in site_equations.tests]
+            for test in site_equations.tests:
+              if test.mlrResult is not None:
+                entero_stats.addValue(test.mlrResult)
             entero_stats.doCalculations()
+
+          #Check to see if there is a entero sample for our date as long as the date
+          #is not the current date.
+          entero_value = None
+          if datetime.now().date() != kwargs['begin_date'].date():
+            entero_value = check_site_date_for_sampling_date(site.name, kwargs['begin_date'], config_file, kwargs['use_logging'])
 
           site_model_ensemble.append({'metadata': site,
                                       'models': site_equations,
-                                      'statistics': entero_stats})
-
-
+                                      'statistics': entero_stats,
+                                      'entero_value': entero_value})
         except Exception,e:
           if logger:
             logger.exception(e)
+
     if logger:
       logger.debug("Total time to execute all sites models: %f ms" % (total_time * 1000))
     output_results(site_model_ensemble=site_model_ensemble,
@@ -196,7 +262,7 @@ def main():
   parser = optparse.OptionParser()
   parser.add_option("-c", "--ConfigFile", dest="config_file",
                     help="INI Configuration file." )
-  parser.add_option("-s", "--StartDateTime", dest="startDateTime",
+  parser.add_option("-s", "--StartDateTime", dest="start_date_time",
                     help="A date to re-run the predictions for, if not provided, the default is the current day. Format is YYYY-MM-DD HH:MM:SS." )
 
   (options, args) = parser.parse_args()
@@ -222,15 +288,22 @@ def main():
     traceback.print_exc(e)
     sys.exit(-1)
   else:
-    if(options.startDateTime != None):
+    dates_to_process = []
+    if options.start_date_time is not None:
+      #Can be multiple dates, so let's split on ','
+      collection_date_list = options.start_date_time.split(',')
       #We are going to process the previous day, so we get the current date, set the time to midnight, then convert
       #to UTC.
       eastern = timezone('US/Eastern')
-      est = eastern.localize(datetime.strptime(options.startDateTime, "%Y-%m-%dT%H:%M:%S"))
-      #est = est - timedelta(days=1)
-      #Convert to UTC
-      begin_date = est.astimezone(timezone('UTC'))
-      end_date = begin_date + timedelta(hours=24)
+      try:
+        for collection_date in collection_date_list:
+          est = eastern.localize(datetime.strptime(collection_date, "%Y-%m-%dT%H:%M:%S"))
+          #Convert to UTC
+          begin_date = est.astimezone(timezone('UTC'))
+          dates_to_process.append(begin_date)
+      except Exception,e:
+        if logger:
+          logger.exception(e)
     else:
       #We are going to process the previous day, so we get the current date, set the time to midnight, then convert
       #to UTC.
@@ -238,11 +311,13 @@ def main():
       est = est.replace(hour=0, minute=0, second=0,microsecond=0)
       #Convert to UTC
       begin_date = est.astimezone(timezone('UTC'))
+      dates_to_process.append(begin_date)
 
     try:
-      run_wq_models(begin_date=begin_date,
-                    config_file_name=options.config_file,
-                    use_logging=use_logging)
+      for process_date in dates_to_process:
+        run_wq_models(begin_date=process_date,
+                      config_file_name=options.config_file,
+                      use_logging=use_logging)
     except Exception, e:
       logger.exception(e)
 

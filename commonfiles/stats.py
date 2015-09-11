@@ -83,7 +83,7 @@ class stats(object):
         self.median = (self.items[ndx_lo] + self.items[ndx_lo+1]) / 2.0
       else:
         med_ndx = (item_count + 1) / 2
-        self.median = self.items(med_ndx)
+        self.median = self.items[med_ndx]
       '''
       for val in self.items:
         self.total += val

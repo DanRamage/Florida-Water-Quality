@@ -9,8 +9,8 @@ def main():
   #base_url = 'http://cdo.ncdc.noaa.gov/qclcd/QCLCD?'
   base_url = "http://www.ncdc.noaa.gov/qclcd/QCLCD?prior=N"
   dest_dir = '/Users/danramage/Documents/workspace/WaterQuality/Florida_Water_Quality/data/in-situ/nws-ksrq/months/'
-  start_date = datetime.strptime('2015-01-01', '%Y-%m-%d')
-  end_date = datetime.strptime('2015-07-01', '%Y-%m-%d')
+  start_date = datetime.strptime('2015-06-30', '%Y-%m-%d')
+  end_date = datetime.strptime('2015-09-01', '%Y-%m-%d')
   next_month = start_date
   start_month = 1
   start_year = 2015
