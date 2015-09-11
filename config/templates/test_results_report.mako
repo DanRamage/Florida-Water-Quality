@@ -5,9 +5,6 @@
       <meta name="viewport" content="width=device-width, initial-scale=1">
       <link href="http://cdmo.baruch.sc.edu/resources/js/bootstrap/bootstrap-3.3.4/css/bootstrap.min.css" rel="stylesheet">
       <link href="http://cdmo.baruch.sc.edu/resources/js/bootstrap/bootstrap-3.3.4/css/bootstrap-theme.min.css" rel="stylesheet">
-      <script type="application/javascript" src="http://cdmo.baruch.sc.edu/resources/js/jquery/jquery-1.11.1.min.js"></script>
-      <script type="application/javascript" src="http://cdmo.baruch.sc.edu/resources/js/bootstrap/bootstrap-3.3.4/js/bootstrap.min.js"></script>
-
 
       <title>Sarasota Water Quality Prediction Results</title>
     </head>
@@ -18,6 +15,11 @@
                 <h2>Prediction for: ${prediction_date}</h2>
                 <h3>Prediction executed: ${execution_date}</h3>
                 </br>
+            </div>
+            <div class = "row">
+              <div class="xs-md-12">
+                <h2><a href='${report_url}'>Report File</a> Click here if the report below displays incorrectly.</h2>
+              </div>
             </div>
             % for site_data in ensemble_tests:
                 <div class="row">
