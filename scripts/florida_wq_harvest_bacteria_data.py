@@ -213,6 +213,8 @@ def build_station_file(bacteria_data, config_file, fl_sites, use_logging):
       logger.exception(e)
   else:
     for site in fl_sites:
+      if logger:
+        logger.debug("Searching for site: %s in bacteria data." % (site.description.lower()))
       if site.description.lower() in bacteria_data:
         if logger:
           logger.debug("Station: %s building file." % (site.name))
@@ -269,12 +271,16 @@ def build_station_file(bacteria_data, config_file, fl_sites, use_logging):
               }
             }
           }
-      try:
-        with open(station_filename, 'w') as station_json_file:
-          station_json_file.write(json.dumps(feature))
-      except (json.JSONDecodeError, IOError) as e:
+        try:
+          with open(station_filename, 'w') as station_json_file:
+            station_json_file.write(json.dumps(feature))
+        except (json.JSONDecodeError, IOError) as e:
+          if logger:
+            logger.exception(e)
+      else:
         if logger:
-          logger.exception(e)
+          logger.debug("Site: %s not found in bacteria data." % (site.description.lower()))
+
 
   if logger:
     logger.debug("Finished build_station_file")
