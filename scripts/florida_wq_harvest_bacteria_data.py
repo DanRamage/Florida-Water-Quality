@@ -152,7 +152,7 @@ def build_current_file(bacteria_data, config_file, fl_sites, use_logging):
           logger.debug("Adding feature site: %s Desc: %s" % (site.name, site.description))
         #Build the json structure the web app is going to use.
         station_data = bacteria_data[site.description.lower()]
-        if isinstance(station_data['value'], int):
+        if isinstance(station_data['value'], int) or isinstance(station_data['value'], long):
           values = station_data['value']
         else:
           values = station_data['value'].split(';')
