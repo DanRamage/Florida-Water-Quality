@@ -222,7 +222,7 @@ def build_station_file(bacteria_data, config_file, fl_sites, use_logging):
         #Now find if we have the station file already, if not we create it.
         station_filename = os.path.join(station_results_directory, '%s.json' % (site.name))
         feature = None
-        if isinstance(station_data['value'], int):
+        if isinstance(station_data['value'], int) or isinstance(station_data['value'], long):
           values = station_data['value']
         else:
           values = station_data['value'].split(';')
