@@ -15,6 +15,17 @@ from collections import OrderedDict
 
 from florida_wq_data import florida_sample_sites
 
+VB_FUNCTIONS_REPLACE = [
+  ("POLY", "VB_POLY"),
+  ("QUADROOT", "VB_QUADROOT"),
+  ("SQUAREROOT", "VB_SQUAREROOT"),
+  ("INVERSE", "VB_INVERSE"),
+  ("SQUARE", "VB_SQUARE"),
+  ("WindO_comp", "VB_WindO_comp"),
+  ("WindA_comp", "VB_WindA_comp"),
+  ("LOG10", "VB_LOG10")
+]
+
 def read_sheet_data(work_sheet, site_name, output_dir):
   sheet_data = []
   #First two columns should always be the autonumber and Log10(ent)
@@ -46,6 +57,12 @@ def read_sheet_data(work_sheet, site_name, output_dir):
             value = value.strip()
             if value == 'Log10(ent)':
               value = 'Log10ent'
+            else:
+              for vb_replacement in VB_FUNCTIONS_REPLACE:
+                if cell.value.find(vb_replacement[0]) != -1:
+                  value = cell.value.replace('[', '_').replace(']', '_').replace(',', '_')
+                  break
+
           row_data.append(str(value))
       csv_output_file.write(",".join(row_data))
       csv_output_file.write("\n")
@@ -72,6 +89,7 @@ def write_ini_file(site, models, config_file):
     model_cnt = 1
     for model in models:
       model_section = "model_%d" % (model_cnt)
+      print "Model: %s" % (model_section)
       model_config_parser.add_section(model_section)
       data_file = os.path.join(model_data_directory, '%s%s.csv' % (site.name, model))
       model_config_parser.set(model_section, "model_name", model)
@@ -79,8 +97,18 @@ def write_ini_file(site, models, config_file):
       model_config_parser.set(model_section, "roc_image_title", '%s %s Model ROC Curve' % (site.name, model))
       model_config_parser.set(model_section, "performance_indicators_title", '%s Summary' % (model))
       #modelA1<-lm(datA1$Log10ent ~ datA1$c10_min_salinity_144, data=datA1, na.action=na.omit)
-      model_data_cols = models[model]
-      linear_model_str = "lm(%s ~ %s, data=modelDat, na.action=na.omit)" % (model_data_cols[0], model_data_cols[-1])
+      model_data_cols = []
+      for data_col in models[model]:
+        for vb_replacement in VB_FUNCTIONS_REPLACE:
+          if data_col.find(vb_replacement[0]) != -1:
+            data_col= data_col.replace('[', '_').replace(']', '_').replace(',', '_')
+            break
+        model_data_cols.append(data_col)
+
+      data_cols = [model_data_cols[ndx] for ndx in range(1, len(model_data_cols))]
+      linear_model_str = "lm(%s ~ %s, data=modelDat, na.action=na.omit)"\
+                         % (model_data_cols[0],
+                            "+".join(data_cols))
       model_config_parser.set(model_section, "linear_model", linear_model_str)
       model_cnt += 1
   try:
