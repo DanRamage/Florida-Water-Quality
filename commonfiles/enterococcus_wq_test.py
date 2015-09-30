@@ -6,6 +6,8 @@ from sympy.parsing.sympy_parser import parse_expr
 from sympy.core.compatibility import exec_
 from sympy import Float as symFloat
 from sympy import *
+
+import sympy.mpmath.log10 as mpmath_log10
 from collections import OrderedDict
 from wqHistoricalData import wq_defines
 from wq_prediction_tests import predictionTest, predictionLevels
@@ -81,6 +83,14 @@ class VB_WindA_comp(Function):
     result = vb_func.evalf(subs={wind_dir: symFloat(self.args[0]),
                                  wind_spd: symFloat(self.args[1]),
                                  beach_orientation: symFloat(self.args[2])})
+    return result
+
+class VB_LOG10(Function):
+  nargs = 1
+  def _eval_evalf(self, nprec):
+    obs = symbols('obs_symbol')
+    vb_func = mpmath_log10(obs)
+    result = vb_func.evalf(subs={obs: symFloat(self.args[0])})
     return result
 
 """
