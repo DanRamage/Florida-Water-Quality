@@ -60,7 +60,8 @@ def main():
       ("INVERSE", "VB_INVERSE"),
       ("SQUARE", "VB_SQUARE"),
       ("WindO_comp", "VB_WindO_comp"),
-      ("WindA_comp", "VB_WindA_comp")
+      ("WindA_comp", "VB_WindA_comp"),
+      ("LOG10", "VB_LOG10")
     ]
     model_csv_list = glob.glob('%s/*.csv' % (options.model_csv_dir))
     start_line = 5
