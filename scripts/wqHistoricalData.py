@@ -1,7 +1,10 @@
-
+import sys
 import logging.config
 from shapely.wkt import loads as wkt_loads
 import csv
+
+#For large polygons in the boundaries
+csv.field_size_limit(sys.maxsize)
 
 class wq_defines:
   NO_DATA = -9999.0
