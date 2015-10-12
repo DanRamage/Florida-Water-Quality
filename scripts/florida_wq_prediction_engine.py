@@ -135,7 +135,7 @@ def run_wq_models(**kwargs):
 
     #MOve xenia obs db settings into standalone ini. We can then
     #check the main ini file into source control without exposing login info.
-    db_settings_ini = config_file.get('xenia_observation_database', 'xenia_observation_database')
+    db_settings_ini = config_file.get('xenia_observation_database', 'settings_ini')
     xenia_obs_db_config_file = ConfigParser.RawConfigParser()
     xenia_obs_db_config_file.read(db_settings_ini)
 
