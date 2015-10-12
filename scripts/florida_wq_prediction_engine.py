@@ -116,10 +116,11 @@ def run_wq_models(**kwargs):
     logger = logging.getLogger('run_wq_models_logger')
   prediction_testrun_date = datetime.now()
 
-  config_file = ConfigParser.RawConfigParser()
-  config_file.read(kwargs['config_file_name'])
 
   try:
+    config_file = ConfigParser.RawConfigParser()
+    config_file.read(kwargs['config_file_name'])
+
     boundaries_location_file = config_file.get('boundaries_settings', 'boundaries_file')
     sites_location_file = config_file.get('boundaries_settings', 'sample_sites')
     xenia_wq_db_file = config_file.get('database', 'name')
@@ -131,10 +132,21 @@ def run_wq_models(**kwargs):
     model_bbox = config_file.get('hycom_model_data', 'bbox').split(',')
     poly_parts = config_file.get('hycom_model_data', 'within_polygon').split(';')
     model_within_polygon = [(float(lon_lat.split(',')[0]), float(lon_lat.split(',')[1])) for lon_lat in poly_parts]
-    xenia_obs_db_host = config_file.get('xenia_observation_database', 'host')
-    xenia_obs_db_user = config_file.get('xenia_observation_database', 'user')
-    xenia_obs_db_password = config_file.get('xenia_observation_database', 'password')
-    xenia_obs_db_name = config_file.get('xenia_observation_database', 'database')
+
+    #MOve xenia obs db settings into standalone ini. We can then
+    #check the main ini file into source control without exposing login info.
+    db_settings_ini = config_file.get('xenia_observation_database', 'xenia_observation_database')
+    xenia_obs_db_config_file = ConfigParser.RawConfigParser()
+    xenia_obs_db_config_file.read(db_settings_ini)
+
+    xenia_obs_db_host = xenia_obs_db_config_file.get('xenia_observation_database', 'host')
+    xenia_obs_db_user = xenia_obs_db_config_file.get('xenia_observation_database', 'user')
+    xenia_obs_db_password = xenia_obs_db_config_file.get('xenia_observation_database', 'password')
+    xenia_obs_db_name = xenia_obs_db_config_file.get('xenia_observation_database', 'database')
+
+    #output results config file. Again split out into individual ini file
+    #for security.
+    output_settings_ini = config_file.get('output_results', 'settings_ini')
 
   except ConfigParser.Error, e:
     if logger:
@@ -229,7 +241,7 @@ def run_wq_models(**kwargs):
     if logger:
       logger.debug("Total time to execute all sites models: %f ms" % (total_time * 1000))
     output_results(site_model_ensemble=site_model_ensemble,
-                   config_file_name=kwargs['config_file_name'],
+                   config_file_name=output_settings_ini,
                    prediction_date=kwargs['begin_date'],
                    prediction_run_date=prediction_testrun_date,
                    use_logging=kwargs['use_logging'])

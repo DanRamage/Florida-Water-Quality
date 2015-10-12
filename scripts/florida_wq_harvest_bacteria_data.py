@@ -26,9 +26,13 @@ def check_email_for_update(config_file, use_logging):
     logger = logging.getLogger('check_email_for_update_logger')
     logger.debug("Starting check_email_for_update")
   try:
-    email_host = config_file.get("email_settings", "host")
-    email_user = config_file.get("email_settings", "user")
-    email_password = config_file.get("email_settings", "password")
+    email_ini_config_filename = config_file.get("email_settings", "settings_ini")
+    email_ini_config_file = ConfigParser.RawConfigParser()
+    email_ini_config_file.read(email_ini_config_filename)
+
+    email_host = email_ini_config_file.get("email_settings", "host")
+    email_user = email_ini_config_file.get("email_settings", "user")
+    email_password = email_ini_config_file.get("email_settings", "password")
     destination_directory = config_file.get("worksheet_settings", "destination_directory")
   except ConfigParser.Error, e:
     if logger:
