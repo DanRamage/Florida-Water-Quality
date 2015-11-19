@@ -339,7 +339,8 @@ def main():
           data_dict[sample_date] = sample_data
 
         date_keys = data_dict.keys()
-        date_keys.sort()
+        #date_keys.sort()
+        date_keys.sort(reverse=True)
         #Build the individual station json files.
         for date_key in date_keys:
           build_station_file(data_dict[date_key], config_file, fl_sites, use_logging)
