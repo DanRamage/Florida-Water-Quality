@@ -250,7 +250,7 @@ def build_station_file(bacteria_data, config_file, fl_sites, use_logging):
                 if logger:
                   logger.debug("Station: %s adding date: %s" % (site.name, test_data['date']))
                 beachadvisories.append(test_data)
-                beachadvisories.sort(key=lambda x: x['date'], reverse=True)
+                beachadvisories.sort(key=lambda x: x['date'], reverse=False)
           except (json.JSONDecodeError, IOError) as e:
             if logger:
               logger.exception(e)
@@ -340,7 +340,7 @@ def main():
 
         date_keys = data_dict.keys()
         #date_keys.sort()
-        date_keys.sort(reverse=True)
+        date_keys.sort()
         #Build the individual station json files.
         for date_key in date_keys:
           build_station_file(data_dict[date_key], config_file, fl_sites, use_logging)
