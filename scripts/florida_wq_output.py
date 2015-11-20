@@ -55,7 +55,7 @@ class email_wq_results(wq_results):
         self.logger.exception(e)
     else:
       try:
-        subject = "[WQ] Sarasota Prediction Results for %s" % (record['prediction_date'])
+        subject = self.subject % (record['prediction_date'])
         #Now send the email.
         smtp = smtpClass(host=self.mailhost, user=self.user, password=self.password)
         smtp.rcpt_to(self.toaddrs)
@@ -104,7 +104,7 @@ class json_wq_results(wq_results):
             },
             'properties': {
               'desc': site_metadata.name,
-              'ensemble': "",
+              'ensemble': str(test_results.ensemblePrediction),
               'station': site_metadata.name,
               'tests': test_data
             }
