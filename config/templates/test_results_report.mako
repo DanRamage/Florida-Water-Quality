@@ -17,14 +17,19 @@
                 </br>
             </div>
             <div class = "row">
-              <div class="xs-md-12">
+              <div class="col-xs-12">
                 <h2><a href='${report_url}'>Report File</a> Click here if the report below displays incorrectly.</h2>
               </div>
             </div>
             % for site_data in ensemble_tests:
                 <div class="row">
-                    <div class="xs-md-6">
+                    <div class="col-xs-6">
                       <h2>Site: ${site_data['metadata'].name}</h2>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-xs-6">
+                      <h3><span>Overall Prediction: ${str(site_data['models'].ensemblePrediction)}</span></h3>
                     </div>
                 </div>
                 % if site_data['entero_value'] is not None:

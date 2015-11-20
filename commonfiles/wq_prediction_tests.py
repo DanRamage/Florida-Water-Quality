@@ -82,7 +82,7 @@ class wqEquations(object):
   def __init__(self, station, model_equation_list, use_logger=True):
     self.station = station  #The station that this object represents.
     self.tests = []
-    self.ensemblePrediction = predictionLevels.NO_TEST
+    self.ensemblePrediction = predictionLevels(predictionLevels.NO_TEST)
     for model_equation in model_equation_list:
       self.tests.append(model_equation)
     self.data = {} #Data used for the tests.
@@ -139,11 +139,11 @@ class wqEquations(object):
           executedTstCnt += 1
 
       if executedTstCnt:
-        self.ensemblePrediction = int(round(sum / float(executedTstCnt)))
+        self.ensemblePrediction.value = int(round(sum / float(executedTstCnt)))
 
 
     if self.logger is not None:
-      self.logger.debug("Overall Prediction: %d(%s)" %(self.ensemblePrediction, predictionLevels(self.ensemblePrediction).__str__()))
+      self.logger.debug("Overall Prediction: %d(%s)" %(self.ensemblePrediction.value, str(self.ensemblePrediction)))
     return self.ensemblePrediction
 
 
