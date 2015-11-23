@@ -11,14 +11,16 @@
     <body>
         <div class="container">
             <div class="row">
+              <div class="col-xs-12">
                 <h1>Sarasota Water Quality Prediction Results</h1>
                 <h2>Prediction for: ${prediction_date}</h2>
                 <h3>Prediction executed: ${execution_date}</h3>
-                </br>
+              </div>
             </div>
+            </br>
             <div class = "row">
               <div class="col-xs-12">
-                <h2><a href='${report_url}'>Report File</a> Click here if the report below displays incorrectly.</h2>
+                <h4><a href='${report_url}'>Report File</a> Click here if the report below displays incorrectly.</h4>
               </div>
             </div>
             % for site_data in ensemble_tests:
