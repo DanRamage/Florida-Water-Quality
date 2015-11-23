@@ -57,11 +57,31 @@
                                 <th>StdDev Entero</th>
                             </tr>
                             <tr>
-                              <td>${"%.2f" % (site_data['statistics'].minVal)}</td>
-                              <td>${"%.2f" % (site_data['statistics'].maxVal)}</td>
-                              <td>${"%.2f" % (site_data['statistics'].average)}</td>
-                              <td>${"%.2f" % (site_data['statistics'].median)}</td>
-                              <td>${"%.2f" % (site_data['statistics'].stdDev)}</td>
+                              % if site_data['statistics'].minVal is not None:
+                                <td>${"%.2f" % (site_data['statistics'].minVal)}</td>
+                              % else:
+                                <td></td>
+                              % endif
+                              % if site_data['statistics'].maxVal is not None:
+                                <td>${"%.2f" % (site_data['statistics'].maxVal)}</td>
+                              % else:
+                                <td></td>
+                              % endif
+                              % if site_data['statistics'].average is not None:
+                                  <td>${"%.2f" % (site_data['statistics'].average)}</td>
+                              % else:
+                                <td></td>
+                              % endif
+                              % if site_data['statistics'].median is not None:
+                                  <td>${"%.2f" % (site_data['statistics'].median)}</td>
+                              % else:
+                                <td></td>
+                              % endif
+                              % if site_data['statistics'].stdDev is not None:
+                                  <td>${"%.2f" % (site_data['statistics'].stdDev)}</td>
+                              % else:
+                                <td></td>
+                              % endif
                             </tr>
                         </table>
                     </div>
