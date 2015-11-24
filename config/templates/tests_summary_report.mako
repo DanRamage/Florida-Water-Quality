@@ -3,8 +3,8 @@
 <html lang="en">
     <head>
       <meta name="viewport" content="width=device-width, initial-scale=1">
-      <link href="http://cdmo.baruch.sc.edu/resources/js/bootstrap/bootstrap-3.3.4/css/bootstrap.min.css" rel="stylesheet">
-      <link href="http://cdmo.baruch.sc.edu/resources/js/bootstrap/bootstrap-3.3.4/css/bootstrap-theme.min.css" rel="stylesheet">
+      <link href="http://media.howsthebeach.org/js/bootstrap/bootstrap-3.3.4/css/bootstrap.min.css" rel="stylesheet">
+      <link href="http://media.howsthebeach.org/js/bootstrap/bootstrap-3.3.4/css/bootstrap-theme.min.css" rel="stylesheet">
 
       <title>Sarasota Water Quality Prediction Results</title>
     </head>
