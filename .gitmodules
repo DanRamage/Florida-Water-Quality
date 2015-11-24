@@ -1,0 +1,3 @@
+[submodule "commonfiles"]
+	path = commonfiles
+	url = https://github.com/DanRamage/commonfiles.git
