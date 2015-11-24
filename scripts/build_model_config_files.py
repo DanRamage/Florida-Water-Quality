@@ -1,5 +1,5 @@
 import sys
-sys.path.append('../commonfiles')
+sys.path.append('../commonfiles/python')
 import os
 import logging.config
 import csv
