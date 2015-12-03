@@ -129,3 +129,42 @@ class json_wq_results(wq_results):
     if self.logger:
       self.logger.debug("Finished emit for json output.")
     return
+
+
+class csv_wq_results(wq_results):
+  def __init__(self, csv_outfile, use_logging):
+    wq_results.__init__(self, use_logging)
+    self.csv_outfile = csv_outfile
+
+  def emit(self, record):
+    if self.logger:
+      self.logger.debug("Starting emit for csv output.")
+
+    ensemble_data = record['ensemble_tests']
+    try:
+      with open(self.csv_outfile, 'w') as csv_output_file:
+        for rec in ensemble_data:
+          site_metadata = rec['metadata']
+          test_results = rec['models']
+          entero_val = rec['entero_value']
+          if entero_val is None:
+            entero_val = ''
+          for test in test_results.tests:
+            try:
+              mlr_result = ''
+              if test.mlrResult is not None:
+                mlr_result = str(test.mlrResult)
+              csv_output_file.write('%s,%s,%s,%s,%s\n' % (record['prediction_date'],
+                                                      site_metadata.name,
+                                                      test.model_name,
+                                                      mlr_result,
+                                                      entero_val))
+            except Exception,e:
+              if self.logger:
+                self.logger.exception(e)
+    except IOError,e:
+      if self.logger:
+        self.logger.exception(e)
+    if self.logger:
+      self.logger.debug("Finished emit for csv output.")
+    return
