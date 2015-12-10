@@ -240,7 +240,7 @@ def build_current_file(bacteria_data, config_file, fl_sites, build_missing, use_
 
   return
 
-def build_station_file(bacteria_data, config_file, fl_sites, use_logging):
+def build_station_file(bacteria_data, config_file, fl_sites, build_missing, use_logging):
   logger = None
   if use_logging:
     logger = logging.getLogger('build_station_file_logger')
@@ -256,6 +256,7 @@ def build_station_file(bacteria_data, config_file, fl_sites, use_logging):
     for site in fl_sites:
       if logger:
         logger.debug("Searching for site: %s in bacteria data." % (site.description.lower()))
+      values = None
       if site.description.lower() in bacteria_data:
         if logger:
           logger.debug("Station: %s building file." % (site.name))
@@ -270,7 +271,9 @@ def build_station_file(bacteria_data, config_file, fl_sites, use_logging):
         else:
           values = station_data['value'].split(';')
           values = [int(val.strip()) for val in values]
-
+      elif build_missing:
+        values = []
+      if values is not None:
         test_data = {
           'date': station_data['sample_date'].strftime('%Y-%m-%d %H:%M:%S'),
           'station': site.name,
@@ -383,7 +386,7 @@ def main():
         date_keys.sort()
         #Build the individual station json files.
         for date_key in date_keys:
-          build_station_file(data_dict[date_key], config_file, fl_sites, use_logging)
+          build_station_file(data_dict[date_key], config_file, fl_sites, True, use_logging)
         #Build the most current results for all the stations.
         build_current_file(data_dict[date_keys[-1]], config_file, fl_sites, True, use_logging)
 
