@@ -258,14 +258,9 @@ def build_station_file(bacteria_data, config_file, fl_sites, build_missing, use_
         logger.debug("Searching for site: %s in bacteria data." % (site.description.lower()))
       values = None
       if site.description.lower() in bacteria_data:
-        if logger:
-          logger.debug("Station: %s building file." % (site.name))
 
         station_data = bacteria_data[site.description.lower()]
 
-        #Now find if we have the station file already, if not we create it.
-        station_filename = os.path.join(station_results_directory, '%s.json' % (site.name))
-        feature = None
         if isinstance(station_data['value'], int) or isinstance(station_data['value'], long):
           values = station_data['value']
         else:
@@ -274,6 +269,12 @@ def build_station_file(bacteria_data, config_file, fl_sites, build_missing, use_
       elif build_missing:
         values = []
       if values is not None:
+        if logger:
+          logger.debug("Station: %s building file." % (site.name))
+        feature = None
+        #Now find if we have the station file already, if not we create it.
+        station_filename = os.path.join(station_results_directory, '%s.json' % (site.name))
+
         test_data = {
           'date': station_data['sample_date'].strftime('%Y-%m-%d %H:%M:%S'),
           'station': site.name,
