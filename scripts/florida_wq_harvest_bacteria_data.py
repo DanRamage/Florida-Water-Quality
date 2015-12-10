@@ -130,7 +130,35 @@ def parse_sheet_data(xl_file_name, use_logging):
 
   return sample_data, sample_date
 
-def build_current_file(bacteria_data, config_file, fl_sites, use_logging):
+def build_feature(site, sample_date, values, logger):
+  if logger:
+    logger.debug("Adding feature site: %s Desc: %s" % (site.name, site.description))
+  feature = {
+    'type': 'Feature',
+    'geometry': {
+      'type': 'Point',
+      'coordinates': [site.object_geometry.x, site.object_geometry.y]
+    },
+    'properties' : {
+      'locale': site.description,
+      'sign': False,
+      'station': site.name,
+      'epaid': site.epa_id,
+      'beach': site.county,
+      'desc': site.description,
+      'len': '',
+      'test': {
+        'beachadvisories': {
+          'date': sample_date,
+          'station': site.name,
+          'value': values
+        }
+      }
+    }
+  }
+  return feature
+
+def build_current_file(bacteria_data, config_file, fl_sites, build_missing, use_logging):
   logger = None
   if use_logging:
     logger = logging.getLogger('build_predictions_file_logger')
@@ -147,10 +175,11 @@ def build_current_file(bacteria_data, config_file, fl_sites, use_logging):
     features = []
     #Let's go site by site and find the data in the worksheet. Currently we only get the
     #data for Sarasota county.
+    values = []
     for site in fl_sites:
       if logger:
         logger.debug("Site: %s Desc: %s searching data" % (site.name, site.description))
-
+      values = None
       if site.description.lower() in bacteria_data:
         if logger:
           logger.debug("Adding feature site: %s Desc: %s" % (site.name, site.description))
@@ -161,6 +190,14 @@ def build_current_file(bacteria_data, config_file, fl_sites, use_logging):
         else:
           values = station_data['value'].split(';')
           values = [int(val.strip()) for val in values]
+      elif build_missing:
+        values = []
+
+      if values is not None:
+        feature = build_feature(site, station_data['sample_date'].strftime('%Y-%m-%d %H:%M:%S'), values, logger)
+        features.append(feature)
+
+        """
         feature = {
           'type': 'Feature',
           'geometry': {
@@ -184,7 +221,7 @@ def build_current_file(bacteria_data, config_file, fl_sites, use_logging):
             }
           }
         }
-        features.append(feature)
+        """
 
     try:
       with open(advisory_results_filename, "w") as json_out_file:
@@ -299,6 +336,8 @@ def main():
                     help="If set, this will create the current the stations json file with the latest data.")
   parser.add_option("-i", "--CreateStationsFile", dest="create_stations", default=False,
                     help="If set, this will create or update the individual station json file with the data from latest email.")
+  parser.add_option("-d", "--DateFile", dest="date_file", default=None,
+                    help="If provided, full file path for a list of dates processed.")
 
   (options, args) = parser.parse_args()
 
@@ -338,6 +377,7 @@ def main():
           sample_data, sample_date = parse_sheet_data(data_file, use_logging)
           data_dict[sample_date] = sample_data
 
+
         date_keys = data_dict.keys()
         #date_keys.sort()
         date_keys.sort()
@@ -345,7 +385,14 @@ def main():
         for date_key in date_keys:
           build_station_file(data_dict[date_key], config_file, fl_sites, use_logging)
         #Build the most current results for all the stations.
-        build_current_file(data_dict[date_keys[-1]], config_file, fl_sites, use_logging)
+        build_current_file(data_dict[date_keys[-1]], config_file, fl_sites, True, use_logging)
+
+        if options.date_file is not None:
+          with open(options.date_file, 'w') as date_file_obj:
+            if date_file_obj is not None:
+              for date_key in date_keys:
+                date_file_obj.write('%s,' % (date_key))
+              date_file_obj.write('\n')
   return
 
 
