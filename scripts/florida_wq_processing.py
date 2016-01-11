@@ -57,7 +57,7 @@ def create_historical_summary(config_file_name,
     #If we provide a tide file that has the historical data, we'll load it instead of using
     #the SOAP webservice.
     tide_file = None
-    if len(tide_csv_file):
+    if tide_csv_file is not None and len(tide_csv_file):
       tide_file = tide_data_file(logger=True)
       tide_file.open(tide_csv_file)
     try:

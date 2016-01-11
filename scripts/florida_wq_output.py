@@ -141,10 +141,11 @@ class csv_wq_results(wq_results):
       self.logger.debug("Starting emit for csv output.")
 
     ensemble_data = record['ensemble_tests']
-    try:
-      with open(self.csv_outfile, 'w') as csv_output_file:
-        for rec in ensemble_data:
-          site_metadata = rec['metadata']
+    for rec in ensemble_data:
+      try:
+        site_metadata = rec['metadata']
+        file_name = self.csv_outfile % (site_metadata.name)
+        with open(file_name, 'a') as csv_output_file:
           test_results = rec['models']
           entero_val = rec['entero_value']
           if entero_val is None:
@@ -162,9 +163,9 @@ class csv_wq_results(wq_results):
             except Exception,e:
               if self.logger:
                 self.logger.exception(e)
-    except IOError,e:
-      if self.logger:
-        self.logger.exception(e)
+      except IOError,e:
+        if self.logger:
+          self.logger.exception(e)
     if self.logger:
       self.logger.debug("Finished emit for csv output.")
     return

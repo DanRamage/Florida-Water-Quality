@@ -251,6 +251,9 @@ class florida_wq_historical_data(wq_data):
     wq_tests_data[var_name] = wq_defines.NO_DATA
     var_name = 'tide_lo_%s' % (self.tide_station)
     wq_tests_data[var_name] = wq_defines.NO_DATA
+    var_name = 'tide_stage_%s' % (self.tide_station)
+    wq_tests_data[var_name] = wq_defines.NO_DATA
+
     #Build variables for the subordinate tide station.
     var_name = 'tide_range_%s' % (self.tide_offset_settings['tide_station'])
     wq_tests_data[var_name] = wq_defines.NO_DATA
@@ -316,78 +319,6 @@ class florida_wq_historical_data(wq_data):
     if self.logger:
       self.logger.debug("Finished creating and initializing data dict.")
 
-    return
-
-  def get_ncsu_model_data(self, start_date, wq_tests_data):
-    if self.logger:
-      self.logger.debug("Start retrieving ncsu model data: %s" % (start_date))
-
-
-    beginning_time = timezone('UTC').localize(datetime.strptime('1900-12-31 00:00:00', '%Y-%m-%d %H:%M:%S'))
-    begin_date = start_date - timedelta(hours=24)
-    end_date = start_date
-    #Verify that the date we are interested should be in the ncsu model data.
-    if begin_date >= (beginning_time + timedelta(days=self.ncsu_model_time[0])):
-      start_time_delta = begin_date - beginning_time
-      end_time_delta = end_date - beginning_time
-
-      #The time dimension in the model is hours offset since the beginning_time above.
-      #offset_hours = (time_delta.days * 24) + (time_delta.seconds / (60 * 60 * 24))
-      offset_start = (start_time_delta.days) + (start_time_delta.seconds / (60.0 * 60.0 * 24.0))
-      offset_end = (end_time_delta.days) + (end_time_delta.seconds / (60.0 * 60.0 * 24.0))
-      closest_start_ndx = bisect_left(self.ncsu_model_time, offset_start)
-      closest_end_ndx = bisect_left(self.ncsu_model_time, offset_end)
-      if closest_start_ndx != -1 and closest_end_ndx != -1:
-        """
-        with open("/Users/danramage/tmp/salinity_model.csv", "w") as out_file:
-          out_file.write("Latitude,Longitude,Lat Ndx,Lon Ndx\n")
-          for lon_ndx in range(0,len(lon_array)):
-            for lat_ndx in range(0,len(lat_array)):
-              out_file.write("%f,%f,%d,%d\n" % (lat_array[lat_ndx], lon_array[lon_ndx], lat_ndx, lon_ndx))
-        """
-        try:
-          salinity_data = self.ncsu_model.variables['salinity'][closest_start_ndx:closest_end_ndx,0,self.ncsu_latli:self.ncsu_latui,self.ncsu_lonli:self.ncsu_lonui]
-          pt = closestCellFromPtInPolygon(self.site.object_geometry,
-                                          self.ncsu_lon_array, self.ncsu_lat_array,
-                                          salinity_data[0],
-                                          self.ncsu_model.variables['salinity']._FillValue,
-                                          self.ncsu_model_within_polygon)
-          #Get the salinity data
-          avg_salinity_pts = salinity_data[0:closest_end_ndx-closest_start_ndx,pt.y,pt.x]
-          wq_tests_data['ncsu_avg_salinity_24'] = np.average(avg_salinity_pts)
-          wq_tests_data['ncsu_min_salinity'] = avg_salinity_pts.min()
-          wq_tests_data['ncsu_max_salinity'] = avg_salinity_pts.max()
-
-          water_temp_data = self.ncsu_model.variables['temperature'][closest_start_ndx:closest_end_ndx,0,self.ncsu_latli:self.ncsu_latui,self.ncsu_lonli:self.ncsu_lonui]
-          avg_water_temp_pts = water_temp_data[0:closest_end_ndx-closest_start_ndx,pt.y,pt.x]
-          #Get the water temperature data
-          wq_tests_data['ncsu_avg_water_temp_24'] = np.average(avg_water_temp_pts)
-          wq_tests_data['ncsu_min_water_temp'] = avg_water_temp_pts.min()
-          wq_tests_data['ncsu_max_water_temp'] = avg_water_temp_pts.max()
-          if self.logger:
-            cell_lat = self.ncsu_lat_array[pt.y]
-            cell_lon = self.ncsu_lon_array[pt.x]
-            begin_dt = beginning_time + timedelta(days=(self.ncsu_model_time[closest_start_ndx]))
-            end_dt = beginning_time + timedelta(days=(self.ncsu_model_time[closest_end_ndx]))
-            self.logger.debug("Site: %s Dates: %s to %s closest cell@ Lat: %f(%d) Lon: %f(%d) Salinity Avg: %f Water Temp Avg: %f"\
-                              % (self.site.name,\
-                                 begin_dt.strftime('%Y-%m-%dT%H:%M:%S'), end_dt.strftime('%Y-%m-%dT%H:%M:%S'),\
-                                 cell_lat, pt.x, cell_lon, pt.y,\
-                                 wq_tests_data['ncsu_avg_salinity_24'],wq_tests_data['ncsu_avg_water_temp_24']))
-
-        except Exception, e:
-          if self.logger:
-            self.logger.exception(e)
-
-      else:
-        if self.logger:
-          self.logger.error("Cannot find start: %s or end: %s date range." % (offset_start, offset_end))
-    else:
-      if self.logger:
-        self.logger.error("Date: %s out of range of data source." % (start_date))
-
-    if self.logger:
-      self.logger.debug("Finished retrieving ncsu model data: %s" % (start_date))
     return
 
   def get_hycom_model_data(self, start_date, wq_tests_data):
@@ -553,6 +484,26 @@ class florida_wq_historical_data(wq_data):
         wq_tests_data['tide_range_%s' % (self.tide_station)] = tide_rec['range']
         wq_tests_data['tide_hi_%s' % (self.tide_station)] = tide_rec['hi']
         wq_tests_data['tide_lo_%s' % (self.tide_station)] = tide_rec['lo']
+
+        try:
+          #Get previous 24 hours.
+          tide_start_time = (start_date - timedelta(hours=24))
+          tide_end_time = start_date
+
+          tide = noaaTideData(use_raw=True, logger=self.logger)
+
+          tide_stage = tide.get_tide_stage(begin_date = tide_start_time,
+                             end_date = tide_end_time,
+                             station=self.tide_station,
+                             datum='MLLW',
+                             units='feet',
+                             time_zone='GMT')
+          wq_tests_data['tide_stage_%s' % (self.tide_station)] = tide_stage
+
+        except Exception,e:
+          if self.logger:
+            self.logger.exception(e)
+
       #THe web service is unreliable, so if we were using the history csv file, it may still be missing
       #a record, if so, let's try to look it up on the web.
       else:
@@ -573,6 +524,7 @@ class florida_wq_historical_data(wq_data):
                            units='feet',
                            timezone='GMT',
                            smoothData=False)
+
       except Exception,e:
         if self.logger:
           self.logger.exception(e)
@@ -588,6 +540,7 @@ class florida_wq_historical_data(wq_data):
             wq_tests_data['tide_range_%s' % (self.tide_station)] = range
             wq_tests_data['tide_hi_%s' % (self.tide_station)] = tide_data['HH']['value']
             wq_tests_data['tide_lo_%s' % (self.tide_station)] = tide_data['LL']['value']
+            wq_tests_data['tide_stage_%s' % (self.tide_station)] = tide_data['tide_stage']
         else:
           if self.logger:
             self.logger.error("Tide data for station: %s date: %s not available or only partial." % (self.tide_station, start_date))

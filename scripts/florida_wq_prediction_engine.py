@@ -74,13 +74,15 @@ Purpose: For the given site, we check the stations bacteria samples to see
 Return:
   Entero value if found, otherwise None.
 '''
-def check_site_date_for_sampling_date(site_name, test_date, config_file, use_logging):
+def check_site_date_for_sampling_date(site_name, test_date, output_settings_ini, use_logging):
   entero_value = None
   logger = None
   if use_logging:
     logger = logging.getLogger('check_site_date_for_sampling_date_logger')
     logger.debug("Starting check_site_date_for_sampling_date. Site: %s Date: %s" % (site_name, test_date))
   try:
+    config_file = ConfigParser.RawConfigParser()
+    config_file.read(output_settings_ini)
     station_results_directory = config_file.get('output', 'station_results_directory')
   except ConfigParser.Error, e:
     if logger:
@@ -228,7 +230,7 @@ def run_wq_models(**kwargs):
           #is not the current date.
           entero_value = None
           if datetime.now().date() != kwargs['begin_date'].date():
-            entero_value = check_site_date_for_sampling_date(site.name, kwargs['begin_date'], config_file, kwargs['use_logging'])
+            entero_value = check_site_date_for_sampling_date(site.name, kwargs['begin_date'], output_settings_ini, kwargs['use_logging'])
 
           site_model_ensemble.append({'metadata': site,
                                       'models': site_equations,
