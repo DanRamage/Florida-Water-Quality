@@ -12,6 +12,7 @@ import simplejson as json
 import datetime
 
 from florida_wq_data import florida_sample_sites
+from advisory import florida_wq_advisory
 
 def contains(list, filter):
   for x in list:
@@ -19,20 +20,18 @@ def contains(list, filter):
       return True
   return False
 
-def check_email_for_update(config_file, use_logging):
+def check_email_for_update(config_file):
   file_list = []
-  logger = None
-  if use_logging:
-    logger = logging.getLogger('check_email_for_update_logger')
-    logger.debug("Starting check_email_for_update")
+  logger = logging.getLogger('check_email_for_update_logger')
+  logger.debug("Starting check_email_for_update")
   try:
     email_ini_config_filename = config_file.get("email_settings", "settings_ini")
     email_ini_config_file = ConfigParser.RawConfigParser()
     email_ini_config_file.read(email_ini_config_filename)
 
-    email_host = email_ini_config_file.get("email_settings", "host")
-    email_user = email_ini_config_file.get("email_settings", "user")
-    email_password = email_ini_config_file.get("email_settings", "password")
+    email_host = email_ini_config_file.get("sarasota_email_settings", "host")
+    email_user = email_ini_config_file.get("sarasota_email_settings", "user")
+    email_password = email_ini_config_file.get("sarasota_email_settings", "password")
     destination_directory = config_file.get("worksheet_settings", "destination_directory")
   except ConfigParser.Error, e:
     if logger:
@@ -95,11 +94,9 @@ def check_email_for_update(config_file, use_logging):
     logger.debug("Finished check_email_for_update")
   return file_list
 
-def parse_sheet_data(xl_file_name, use_logging):
-  logger = None
-  if use_logging:
-    logger = logging.getLogger('check_email_for_update_logger')
-    logger.debug("Starting parse_sheet_data, parsing file: %s" % (xl_file_name))
+def parse_sheet_data(xl_file_name):
+  logger = logging.getLogger('check_email_for_update_logger')
+  logger.debug("Starting parse_sheet_data, parsing file: %s" % (xl_file_name))
 
 
   sample_data = {}
@@ -131,8 +128,11 @@ def parse_sheet_data(xl_file_name, use_logging):
   return sample_data, sample_date
 
 def build_feature(site, sample_date, values, logger):
-  if logger:
-    logger.debug("Adding feature site: %s Desc: %s" % (site.name, site.description))
+
+  logger = logging.getLogger('build_feature_logger')
+  logger.debug("Starting build_feature_logger")
+  logger.debug("Adding feature site: %s Desc: %s" % (site.name, site.description))
+
   feature = {
     'type': 'Feature',
     'geometry': {
@@ -158,11 +158,9 @@ def build_feature(site, sample_date, values, logger):
   }
   return feature
 
-def build_current_file(bacteria_data, config_file, fl_sites, build_missing, use_logging):
-  logger = None
-  if use_logging:
-    logger = logging.getLogger('build_predictions_file_logger')
-    logger.debug("Starting build_predictions_file")
+def build_current_file(data_dict, date_keys, config_file, fl_sites, build_missing):
+  logger = logging.getLogger('build_current_file_logger')
+  logger.debug("Starting build_current_file")
 
   try:
     advisory_results_filename = config_file.get('json_settings', 'advisory_results')
@@ -176,13 +174,25 @@ def build_current_file(bacteria_data, config_file, fl_sites, build_missing, use_
     #Let's go site by site and find the data in the worksheet. Currently we only get the
     #data for Sarasota county.
     values = []
+    bacteria_data = {}
     for site in fl_sites:
+      #Find the most recent sample dates. Currently for Manatee we don't get the actual
+      #bacteria sample data, so we harvest the advisory(either there is an advisory or not)
+      #from the florida site: http://www.floridahealth.gov/environmental-health/beach-water-quality/county-detail.html?County=Manatee&Zip=34208-1928
+      #The based on the site we get the data for the most current date, which may not
+      #be the same for Manatee Country as it is for Sarasota.
+      for ndx, sample_date in reversed(list(enumerate(date_keys))):
+        data = data_dict[sample_date]
+        if site.description.lower() in data:
+          bacteria_data = data
+          break
       if logger:
         logger.debug("Site: %s Desc: %s searching data" % (site.name, site.description))
       values = None
       if site.description.lower() in bacteria_data:
         if logger:
           logger.debug("Adding feature site: %s Desc: %s" % (site.name, site.description))
+
         #Build the json structure the web app is going to use.
         station_data = bacteria_data[site.description.lower()]
         if isinstance(station_data['value'], int) or isinstance(station_data['value'], long):
@@ -236,15 +246,68 @@ def build_current_file(bacteria_data, config_file, fl_sites, build_missing, use_
         logger.exception(e)
 
   if logger:
-    logger.debug("Finished build_predictions_file")
+    logger.debug("Finished build_current_file")
 
   return
 
-def build_station_file(bacteria_data, config_file, fl_sites, build_missing, use_logging):
-  logger = None
-  if use_logging:
-    logger = logging.getLogger('build_station_file_logger')
-    logger.debug("Starting build_station_file")
+"""
+def build_current_file(bacteria_data, config_file, fl_sites, build_missing):
+  logger = logging.getLogger('build_current_file_logger')
+  logger.debug("Starting build_current_file")
+
+  try:
+    advisory_results_filename = config_file.get('json_settings', 'advisory_results')
+    station_results_directory = config_file.get('json_settings', 'station_results_directory')
+
+  except ConfigParser.Error, e:
+    if logger:
+      logger.exception(e)
+  else:
+    features = []
+    #Let's go site by site and find the data in the worksheet. Currently we only get the
+    #data for Sarasota county.
+    values = []
+    for site in fl_sites:
+      if logger:
+        logger.debug("Site: %s Desc: %s searching data" % (site.name, site.description))
+      values = None
+      if site.description.lower() in bacteria_data:
+        if logger:
+          logger.debug("Adding feature site: %s Desc: %s" % (site.name, site.description))
+        #Build the json structure the web app is going to use.
+        station_data = bacteria_data[site.description.lower()]
+        if isinstance(station_data['value'], int) or isinstance(station_data['value'], long):
+          values = station_data['value']
+        else:
+          values = station_data['value'].split(';')
+          values = [int(val.strip()) for val in values]
+      elif build_missing:
+        values = []
+
+      if values is not None:
+        feature = build_feature(site, station_data['sample_date'].strftime('%Y-%m-%d %H:%M:%S'), values, logger)
+        features.append(feature)
+
+    try:
+      with open(advisory_results_filename, "w") as json_out_file:
+        #Now output JSON file.
+        json_data = {
+          'type': 'FeatureCollection',
+          'features': features
+        }
+        json_out_file.write(json.dumps(json_data, sort_keys=True))
+    except (json.JSONDecodeError, IOError) as e:
+      if logger:
+        logger.exception(e)
+
+  if logger:
+    logger.debug("Finished build_current_file")
+
+  return
+"""
+def build_station_file(bacteria_data, config_file, fl_sites, build_missing):
+  logger = logging.getLogger('build_station_file_logger')
+  logger.debug("Starting build_station_file")
 
   try:
     station_results_directory = config_file.get('json_settings', 'station_results_directory')
@@ -332,6 +395,74 @@ def build_station_file(bacteria_data, config_file, fl_sites, build_missing, use_
 
   return
 
+def get_sarasota_county_data(config_filename, data_dict):
+  results = []
+  config_file = ConfigParser.RawConfigParser()
+  config_file.read(config_filename)
+
+  logger = logging.getLogger('get_sarasota_county_data_logger')
+  logger.debug("Starting get_sarasota_county_data")
+
+  swim_adv = florida_wq_advisory('sarasota', config_filename)
+  #advisories = swim_adv.get_advisories()
+  #advisories_date = advisories[0]['date']
+  data_file_list = check_email_for_update(config_file)
+  logger.debug("Received %d wq file emails" % (len(data_file_list)))
+  if len(data_file_list):
+    for data_file in data_file_list:
+      sample_data, sample_date = parse_sheet_data(data_file)
+      """
+      if advisories_date == sample_date:
+        for advisory in advisories:
+          if advisory['site_name'].lower() in sample_data:
+            sample_data['advisory_sign'] = advisory['advisory']
+          else:
+            logger.debug("%s advisory station did not match sample data station" % (advisory['site_name']))
+      """
+      if sample_date not in data_dict:
+        data_dict[sample_date] = sample_data
+      results.append({'sample_date': sample_date,
+                      'sample_data': sample_data})
+      #data_dict[sample_date] = sample_data
+
+  return results
+
+def get_manatee_county_data(config_filename, fl_sites, data_dict):
+  results = []
+  logger = logging.getLogger('get_manatee_county_data_logger')
+  logger.debug("Starting get_manatee_county_data")
+  #For now, we do not have the manatee bacteria sample data results.
+  #The best we can do is use the current results from the advisory
+  #page.
+  swim_adv = florida_wq_advisory('manatee', config_filename)
+  advisories = swim_adv.get_advisories()
+  advisories_date = advisories[0]['date']
+  sample_data = {}
+  for advisory in advisories:
+    #An advisory occurs when the etcoc value is 104 or greater, so if the
+    #advisory data we downloaded has an advisory issued, the bacteria count
+    #has to be at least 104.
+    value = 0
+    if advisory['advisory']:
+      value = 104
+    sample_data[advisory['site_name']] = {
+      'sample_date': advisory['date'],
+      'value': value
+    }
+    sample_date = advisory['date']
+    if sample_date not in data_dict:
+      data_dict[sample_date] = sample_data
+    else:
+      rec = data_dict[sample_date]
+      rec[advisory['site_name']] = {
+        'sample_date': advisory['date'],
+        'value': value
+      }
+
+  results.append({'sample_date': advisories_date,
+                  'sample_data': sample_data})
+
+  return results
 def main():
   parser = optparse.OptionParser()
   parser.add_option("-c", "--ConfigFile", dest="config_file", default=None,
@@ -372,31 +503,34 @@ def main():
       if logger:
         logger.exception(e)
     else:
-      data_file_list = check_email_for_update(config_file, use_logging)
-      if len(data_file_list):
-        fl_sites = florida_sample_sites(True)
-        fl_sites.load_sites(file_name=sites_location_file, boundary_file=boundaries_location_file)
-        data_dict = {}
-        for data_file in data_file_list:
-          sample_data, sample_date = parse_sheet_data(data_file, use_logging)
-          data_dict[sample_date] = sample_data
 
+      fl_sites = florida_sample_sites(True)
+      fl_sites.load_sites(file_name=sites_location_file, boundary_file=boundaries_location_file)
 
-        date_keys = data_dict.keys()
-        #date_keys.sort()
-        date_keys.sort()
-        #Build the individual station json files.
-        for date_key in date_keys:
-          build_station_file(data_dict[date_key], config_file, fl_sites, True, use_logging)
-        #Build the most current results for all the stations.
-        build_current_file(data_dict[date_keys[-1]], config_file, fl_sites, True, use_logging)
+      data_dict = {}
+      sarasota_results = get_sarasota_county_data(options.config_file, data_dict)
+      #for results in sarasota_results:
+      #  sample_date = results['sample_date']
+      #  if sample_date not in data_dict:
+      #    data_dict[sample_date] = results['sample_data']
+      manatee_results = get_manatee_county_data(options.config_file, fl_sites, data_dict)
 
-        if options.date_file is not None:
-          with open(options.date_file, 'w') as date_file_obj:
-            if date_file_obj is not None:
-              for date_key in date_keys:
-                date_file_obj.write('%s,' % (date_key))
-              date_file_obj.write('\n')
+      date_keys = data_dict.keys()
+      #date_keys.sort()
+      date_keys.sort()
+      #Build the individual station json files.
+      for date_key in date_keys:
+        build_station_file(data_dict[date_key], config_file, fl_sites, True)
+      #Build the most current results for all the stations.
+      build_current_file(data_dict, date_keys, config_file, fl_sites, True)
+
+      if options.date_file is not None:
+        with open(options.date_file, 'w') as date_file_obj:
+          if date_file_obj is not None:
+            for date_key in date_keys:
+              date_file_obj.write('%s,' % (date_key))
+            date_file_obj.write('\n')
+
   return
 
 
