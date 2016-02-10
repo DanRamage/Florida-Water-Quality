@@ -1,5 +1,5 @@
 import sys
-sys.path.append('../commonfiles')
+sys.path.append('../commonfiles/python')
 
 import logging.config
 
@@ -112,7 +112,7 @@ class florida_sample_sites(sampling_sites):
                   #Add the containing boundary
                   station.contained_by.append(boundary_geometry)
           line_num += 1
-
+        return True
     return False
 
 """

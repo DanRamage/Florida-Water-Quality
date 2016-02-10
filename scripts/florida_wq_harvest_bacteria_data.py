@@ -207,32 +207,6 @@ def build_current_file(data_dict, date_keys, config_file, fl_sites, build_missin
         feature = build_feature(site, station_data['sample_date'].strftime('%Y-%m-%d %H:%M:%S'), values, logger)
         features.append(feature)
 
-        """
-        feature = {
-          'type': 'Feature',
-          'geometry': {
-            'type': 'Point',
-            'coordinates': [site.object_geometry.x, site.object_geometry.y]
-          },
-          'properties' : {
-            'locale': site.description,
-            'sign': False,
-            'station': site.name,
-            'epaid': site.epa_id,
-            'beach': site.county,
-            'desc': site.description,
-            'len': '',
-            'test': {
-              'beachadvisories': {
-                'date': station_data['sample_date'].strftime('%Y-%m-%d %H:%M:%S'),
-                'station': site.name,
-                'value': values
-              }
-            }
-          }
-        }
-        """
-
     try:
       with open(advisory_results_filename, "w") as json_out_file:
         #Now output JSON file.
