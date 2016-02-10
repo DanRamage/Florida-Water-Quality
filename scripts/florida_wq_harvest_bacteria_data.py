@@ -305,9 +305,10 @@ def build_station_file(bacteria_data, config_file, fl_sites, build_missing):
           values = [int(val.strip()) for val in values]
       elif build_missing:
         values = []
+        logger.debug("Site: %s not found in bacteria data" % (site.description.lower()))
       if values is not None:
         if logger:
-          logger.debug("Station: %s building file." % (site.name))
+          logger.debug("Station: %s building file." % (site.description.lower()))
         feature = None
         #Now find if we have the station file already, if not we create it.
         station_filename = os.path.join(station_results_directory, '%s.json' % (site.name))
