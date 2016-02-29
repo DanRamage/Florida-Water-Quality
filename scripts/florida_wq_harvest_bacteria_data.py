@@ -397,6 +397,8 @@ def get_sarasota_county_data(config_filename, data_dict):
   logger.debug("Received %d wq file emails" % (len(data_file_list)))
   if len(data_file_list):
     for data_file in data_file_list:
+      if data_file == "/Users/danramage/Documents/workspace/WaterQuality/Florida_Water_Quality/data/sampling_data/Weekly_Sarasota_Data/02222016.xlsx":
+        i = 0
       sample_data, sample_dates = parse_sheet_data(data_file)
 
       #Some sites can be sampled on different days if they test high one day.
@@ -426,7 +428,7 @@ def get_manatee_county_data(config_filename, fl_sites, data_dict):
     #An advisory occurs when the etcoc value is 104 or greater, so if the
     #advisory data we downloaded has an advisory issued, the bacteria count
     #has to be at least 104.
-    logger.debug("Processing site: %s advisory: %d" % (advisory['site_name'], advisory['advisory']))
+    logger.debug("Processing site: %s Date: %s advisory: %d" % (advisory['site_name'], advisory['date'], advisory['advisory']))
     value = 0
     if advisory['advisory']:
       value = 104
@@ -435,7 +437,7 @@ def get_manatee_county_data(config_filename, fl_sites, data_dict):
       'value': value
     }
     sample_date = advisory['date']
-    if sample_date not in data_dict:
+    if sample_date.date() not in data_dict:
       data_dict[sample_date.date()] = {}
 
     rec = data_dict[sample_date.date()]
