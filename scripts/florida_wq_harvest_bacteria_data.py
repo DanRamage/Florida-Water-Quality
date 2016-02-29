@@ -333,6 +333,7 @@ def build_station_file(bacteria_data, data_date, config_file, fl_sites, build_mi
         #Do we have a station file already, if so get the data.
         if os.path.isfile(station_filename):
           try:
+            logger.debug("Opening station JSON file: %s" % (station_filename))
             with open(station_filename, 'r') as station_json_file:
               feature = json.loads(station_json_file.read())
               beachadvisories = feature['properties']['test']['beachadvisories']
@@ -342,7 +343,7 @@ def build_station_file(bacteria_data, data_date, config_file, fl_sites, build_mi
                   logger.debug("Station: %s adding date: %s" % (site.name, test_data['date']))
                 beachadvisories.append(test_data)
                 beachadvisories.sort(key=lambda x: x['date'], reverse=False)
-          except (json.JSONDecodeError, IOError) as e:
+          except (json.JSONDecodeError, IOError, Exception) as e:
             if logger:
               logger.exception(e)
         #No file, so let's create the station data
