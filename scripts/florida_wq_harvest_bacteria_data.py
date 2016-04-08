@@ -235,61 +235,6 @@ def build_current_file(data_dict, date_keys, config_file, fl_sites, build_missin
 
   return
 
-"""
-def build_current_file(bacteria_data, config_file, fl_sites, build_missing):
-  logger = logging.getLogger('build_current_file_logger')
-  logger.debug("Starting build_current_file")
-
-  try:
-    advisory_results_filename = config_file.get('json_settings', 'advisory_results')
-    station_results_directory = config_file.get('json_settings', 'station_results_directory')
-
-  except ConfigParser.Error, e:
-    if logger:
-      logger.exception(e)
-  else:
-    features = []
-    #Let's go site by site and find the data in the worksheet. Currently we only get the
-    #data for Sarasota county.
-    values = []
-    for site in fl_sites:
-      if logger:
-        logger.debug("Site: %s Desc: %s searching data" % (site.name, site.description))
-      values = None
-      if site.description.lower() in bacteria_data:
-        if logger:
-          logger.debug("Adding feature site: %s Desc: %s" % (site.name, site.description))
-        #Build the json structure the web app is going to use.
-        station_data = bacteria_data[site.description.lower()]
-        if isinstance(station_data['value'], int) or isinstance(station_data['value'], long):
-          values = station_data['value']
-        else:
-          values = station_data['value'].split(';')
-          values = [int(val.strip()) for val in values]
-      elif build_missing:
-        values = []
-
-      if values is not None:
-        feature = build_feature(site, station_data['sample_date'].strftime('%Y-%m-%d %H:%M:%S'), values, logger)
-        features.append(feature)
-
-    try:
-      with open(advisory_results_filename, "w") as json_out_file:
-        #Now output JSON file.
-        json_data = {
-          'type': 'FeatureCollection',
-          'features': features
-        }
-        json_out_file.write(json.dumps(json_data, sort_keys=True))
-    except (json.JSONDecodeError, IOError) as e:
-      if logger:
-        logger.exception(e)
-
-  if logger:
-    logger.debug("Finished build_current_file")
-
-  return
-"""
 def build_station_file(bacteria_data, data_date, config_file, fl_sites, build_missing):
   logger = logging.getLogger('build_station_file_logger')
   logger.debug("Starting build_station_file")
