@@ -56,6 +56,7 @@
                                 <th>Maximum Entero</th>
                                 <th>Average Entero</th>
                                 <th>Median Entero</th>
+                                <th>Geometric Mean</th>
                                 <th>StdDev Entero</th>
                             </tr>
                             <tr>
@@ -76,6 +77,11 @@
                               % endif
                               % if site_data['statistics'].median is not None:
                                   <td>${"%.2f" % (site_data['statistics'].median)}</td>
+                              % else:
+                                <td></td>
+                              % endif
+                              % if site_data['statistics'].geometric_mean is not None:
+                                  <td>${"%.2f" % (site_data['statistics'].geometric_mean)}</td>
                               % else:
                                 <td></td>
                               % endif
