@@ -40,7 +40,17 @@
                 </div>
                 <div class="row">
                     <div class="col-xs-6">
-                      <h3><span>Overall Prediction: ${str(site_data['models'].ensemblePrediction)}</span></h3>
+                      <h3>
+                        % if str(site_data['models'].ensemblePrediction) == 'LOW':
+                          <span>
+                        % elif str(site_data['models'].ensemblePrediction) == 'MEDIUM':
+                          <span class="medium_bacteria">
+                        % else:
+                          <span class="high_bacteria">
+                        % endif
+                          Overall Prediction: ${str(site_data['models'].ensemblePrediction)}
+                        </span>
+                      </h3>
                     </div>
                 </div>
                 % if site_data['entero_value'] is not None:
