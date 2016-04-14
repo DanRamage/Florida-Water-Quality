@@ -9,6 +9,15 @@
       <title>Sarasota Water Quality Prediction Results</title>
     </head>
     <body>
+        <style>
+          .high_bacteria {
+            background-color: #ff3633;
+          }
+          .medium_bacteria {
+            background-color: #fff45c;
+          }
+
+        </style>
         <div class="container">
             <div class="row">
               <div class="col-xs-12">
@@ -113,7 +122,15 @@
                               </td>
                               <td>
                                 % if test_obj.mlrResult is not None:
-                                  ${"%.2f" % (test_obj.mlrResult)}
+                                  % if test_obj.mlrResult < 36:
+                                    <span>
+                                  % elif test_obj.mlrResult >= 36 and test_obj.mlrResult < 104:
+                                    <span class="medium_bacteria">
+                                  % else:
+                                    <span class="high_bacteria">
+                                  % endif
+                                      ${"%.2f" % (test_obj.mlrResult)}
+                                    </span>
                                 % else:
                                   NO TEST
                                 % endif
