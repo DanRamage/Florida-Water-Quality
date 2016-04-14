@@ -112,8 +112,14 @@
                             <th>Data Used</th>
                         </tr>
                         % for test_obj in site_data['models'].tests:
+                            % if test_obj.mlrResult < 36:
+                              <tr>
+                            % elif test_obj.mlrResult >= 36 and test_obj.mlrResult < 104:
+                              <tr class="medium_bacteria">
+                            % else:
+                              <tr class="high_bacteria">
+                            % endif
 
-                            <tr>
                               <td>
                                 ${test_obj.model_name}
                               </td>
@@ -122,15 +128,7 @@
                               </td>
                               <td>
                                 % if test_obj.mlrResult is not None:
-                                  % if test_obj.mlrResult < 36:
-                                    <span>
-                                  % elif test_obj.mlrResult >= 36 and test_obj.mlrResult < 104:
-                                    <span class="medium_bacteria">
-                                  % else:
-                                    <span class="high_bacteria">
-                                  % endif
-                                      ${"%.2f" % (test_obj.mlrResult)}
-                                    </span>
+                                  ${"%.2f" % (test_obj.mlrResult)}
                                 % else:
                                   NO TEST
                                 % endif
