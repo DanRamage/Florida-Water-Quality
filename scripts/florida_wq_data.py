@@ -908,6 +908,7 @@ class florida_wq_model_data(florida_wq_historical_data):
         closest_end_ndx = find_le(self.c10_times, end_epoch_time)
       except ValueError,e:
         if self.logger:
+          self.logger.error("Error finding start or end times. Number C10 times: %d latest epoch: %f" % (self.c10_times.shape[0], self.c10_times[-1]))
           self.logger.exception(e)
       else:
         if closest_start_ndx < len(self.c10_times) and closest_end_ndx < len(self.c10_times):
