@@ -1,0 +1,11 @@
+[Core]
+Name = Sarasota/Manatee Prediction Plugin
+Module = sarasota_prediction_plugin
+Ini=/Users/danramage/Documents/workspace/WaterQuality/Florida_Water_Quality/config/florida_prediction_config_debug.ini
+
+[Documentation]
+Author = Dan Ramage
+Version = 0.1
+Website = http://howsthebeach.org
+Description = Sarasota/Manatee county specific water quality processing.
+
