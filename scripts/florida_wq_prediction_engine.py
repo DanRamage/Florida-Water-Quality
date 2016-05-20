@@ -26,14 +26,11 @@ Purpose: Builds the models used for doing the predictions.
 Parameters:
   config_file - ConfigParser object
   site_name - The name of the site whose models we are building.
-  use_logging - Flag to specify if we are to use logging.
 Return:
   A list of models constructed.
 '''
-def build_test_objects(config_file, site_name, use_logging):
-  logger = None
-  if use_logging:
-    logger = logging.getLogger('build_test_objects_logger')
+def build_test_objects(config_file, site_name):
+  logger = logging.getLogger('build_test_objects_logger')
 
   model_list = []
   #Get the sites test configuration ini, then build the test objects.
@@ -74,12 +71,11 @@ Purpose: For the given site, we check the stations bacteria samples to see
 Return:
   Entero value if found, otherwise None.
 '''
-def check_site_date_for_sampling_date(site_name, test_date, output_settings_ini, use_logging):
+def check_site_date_for_sampling_date(site_name, test_date, output_settings_ini):
   entero_value = None
-  logger = None
-  if use_logging:
-    logger = logging.getLogger('check_site_date_for_sampling_date_logger')
-    logger.debug("Starting check_site_date_for_sampling_date. Site: %s Date: %s" % (site_name, test_date))
+  logger = logging.getLogger('check_site_date_for_sampling_date_logger')
+  logger.debug("Starting check_site_date_for_sampling_date. Site: %s Date: %s" % (site_name, test_date))
+
   try:
     config_file = ConfigParser.RawConfigParser()
     config_file.read(output_settings_ini)
@@ -182,7 +178,7 @@ def run_wq_models(**kwargs):
     for site in fl_sites:
       try:
         #Get all the models used for the particular sample site.
-        model_list = build_test_objects(config_file, site.name, kwargs['use_logging'])
+        model_list = build_test_objects(config_file, site.name)
         #Create the container for all the models.
         site_equations = wqEquations(site.name, model_list, True)
 
@@ -229,7 +225,7 @@ def run_wq_models(**kwargs):
           #is not the current date.
           entero_value = None
           if datetime.now().date() != kwargs['begin_date'].date():
-            entero_value = check_site_date_for_sampling_date(site.name, kwargs['begin_date'], output_settings_ini, kwargs['use_logging'])
+            entero_value = check_site_date_for_sampling_date(site.name, kwargs['begin_date'], output_settings_ini)
 
           site_model_ensemble.append({'metadata': site,
                                       'models': site_equations,
@@ -244,23 +240,21 @@ def run_wq_models(**kwargs):
     output_results(site_model_ensemble=site_model_ensemble,
                    config_file_name=output_settings_ini,
                    prediction_date=kwargs['begin_date'],
-                   prediction_run_date=prediction_testrun_date,
-                   use_logging=kwargs['use_logging'])
+                   prediction_run_date=prediction_testrun_date)
 
   return
 
 def output_results(**kwargs):
-  logger = None
-  if kwargs['use_logging']:
-    logger = logging.getLogger('output_results_logger')
-    logger.debug("Starting output_results")
+  logger = logging.getLogger('output_results_logger')
+  logger.debug("Starting output_results")
+
   record = {
     'prediction_date': kwargs['prediction_date'].astimezone(timezone("US/Eastern")).strftime("%Y-%m-%d %H:%M:%S"),
     'execution_date': kwargs['prediction_run_date'].strftime("%Y-%m-%d %H:%M:%S"),
     'ensemble_tests': kwargs['site_model_ensemble']
   }
   try:
-    results_out = results_exporter(kwargs['use_logging'])
+    results_out = results_exporter(True)
     results_out.load_configuration(kwargs['config_file_name'])
     results_out.output(record)
   except Exception, e:
