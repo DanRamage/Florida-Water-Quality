@@ -183,11 +183,12 @@ class florida_wq_historical_data(wq_data):
       self.logger.debug("Connection to xenia db: %s" % (kwargs['xenia_database_name']))
     self.xenia_db = wqDB(kwargs['xenia_database_name'], type(self).__name__)
 
+  """
   def __del__(self):
     if self.logger:
       self.logger.debug("Closing connection to xenia db")
     self.xenia_db.DB.close()
-
+  """
     if self.logger:
       self.logger.debug("Closing connection to thredds endpoint.")
     self.ncObj.close()
@@ -773,13 +774,13 @@ class florida_wq_model_data(florida_wq_historical_data):
     else:
       self.logger.error("Unable to connect to DB: %s at %s." %(kwargs['xenia_obs_db_name'],kwargs['xenia_obs_db_host']))
 
-
+  """
   def __del__(self):
     florida_wq_historical_data.__del__(self)
     if self.logger:
       self.logger.debug("Disconnecting xenia obs database.")
     self.xenia_obs_db.disconnect()
-
+  """
 
   """
   Function: initialize_return_data
