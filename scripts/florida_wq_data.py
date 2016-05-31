@@ -765,10 +765,7 @@ class florida_wq_model_data(florida_wq_historical_data):
       if self.logger:
         self.logger.debug("Connection to xenia db: %s" % (kwargs['xenia_database_name']))
       self.xenia_db = wqDB(kwargs['xenia_database_name'], type(self).__name__)
-    except Exception as e:
-      if self.logger:
-        self.logger.exception(e)
-    try:
+
       #Connect to the xenia database we use for observations aggregation.
       self.xenia_obs_db = xeniaAlchemy()
       if self.xenia_obs_db.connectDB(kwargs['xenia_obs_db_type'], kwargs['xenia_obs_db_user'], kwargs['xenia_obs_db_password'], kwargs['xenia_obs_db_host'], kwargs['xenia_obs_db_name'], False):
