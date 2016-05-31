@@ -153,94 +153,97 @@ def run_wq_models(**kwargs):
     fl_sites = florida_sample_sites(True)
     fl_sites.load_sites(file_name=sites_location_file, boundary_file=boundaries_location_file)
     #Retrieve the data needed for the models.
-
-    fl_wq_data = florida_wq_model_data(xenia_database_name=xenia_wq_db_file,
-                                  c_10_tds_url=c_10_tds_url,
-                                  c_10_time_var=c_10_time_var,
-                                  c_10_salinity_var=c_10_salinity_var,
-                                  c_10_water_temp_var=c_10_water_temp_var,
-                                  hycom_model_tds_url=hycom_model_tds_url,
-                                  model_bbox=model_bbox,
-                                  model_within_polygon=model_within_polygon,
-                                  xenia_obs_db_type='postgres',
-                                  xenia_obs_db_host=xenia_obs_db_host,
-                                  xenia_obs_db_user=xenia_obs_db_user,
-                                  xenia_obs_db_password=xenia_obs_db_password,
-                                  xenia_obs_db_name=xenia_obs_db_name,
-                                  use_logger=True)
-
-    site_model_ensemble = []
-    #First pass we want to get all the data, after that we only need to query
-    #the site specific pieces.
-    reset_site_specific_data_only = False
-    site_data = OrderedDict()
-    total_time = 0
-    for site in fl_sites:
-      try:
-        #Get all the models used for the particular sample site.
-        model_list = build_test_objects(config_file, site.name)
-        #Create the container for all the models.
-        site_equations = wqEquations(site.name, model_list, True)
-
-        #Get the station specific tide stations
-        tide_station = config_file.get(site.name, 'tide_station')
-        offset_tide_station = config_file.get(site.name, 'offset_tide_station')
-        #We use the virtual tide sites as there no stations near the sites.
-        tide_offset_settings = {
-          'tide_station': config_file.get(offset_tide_station, 'station_id'),
-          'hi_tide_time_offset': config_file.getint(offset_tide_station, 'hi_tide_time_offset'),
-          'lo_tide_time_offset': config_file.getint(offset_tide_station, 'lo_tide_time_offset'),
-          'hi_tide_height_offset': config_file.getfloat(offset_tide_station, 'hi_tide_height_offset'),
-          'lo_tide_height_offset': config_file.getfloat(offset_tide_station, 'lo_tide_height_offset')
-        }
-      except ConfigParser.Error, e:
-        if logger:
-          logger.exception(e)
-      else:
-        fl_wq_data.reset(site=site,
-                          tide_station=tide_station,
-                          tide_offset_params=tide_offset_settings)
-        #site_data = OrderedDict([('station_name',site.name)])
-        site_data['station_name'] = site.name
+    try:
+      fl_wq_data = florida_wq_model_data(xenia_database_name=xenia_wq_db_file,
+                                    c_10_tds_url=c_10_tds_url,
+                                    c_10_time_var=c_10_time_var,
+                                    c_10_salinity_var=c_10_salinity_var,
+                                    c_10_water_temp_var=c_10_water_temp_var,
+                                    hycom_model_tds_url=hycom_model_tds_url,
+                                    model_bbox=model_bbox,
+                                    model_within_polygon=model_within_polygon,
+                                    xenia_obs_db_type='postgres',
+                                    xenia_obs_db_host=xenia_obs_db_host,
+                                    xenia_obs_db_user=xenia_obs_db_user,
+                                    xenia_obs_db_password=xenia_obs_db_password,
+                                    xenia_obs_db_name=xenia_obs_db_name,
+                                    use_logger=True)
+    except Exception as e:
+      if logger:
+        logger.exception(e)
+    else:
+      site_model_ensemble = []
+      #First pass we want to get all the data, after that we only need to query
+      #the site specific pieces.
+      reset_site_specific_data_only = False
+      site_data = OrderedDict()
+      total_time = 0
+      for site in fl_sites:
         try:
-          fl_wq_data.query_data(kwargs['begin_date'], kwargs['begin_date'], site_data, reset_site_specific_data_only)
-          reset_site_specific_data_only = True
-          site_equations.runTests(site_data)
-          total_test_time = sum(testObj.test_time for testObj in site_equations.tests)
-          if logger:
-            logger.debug("Site: %s total time to execute models: %f ms" % (site.name, total_test_time * 1000))
-          total_time += total_test_time
-          #Calculate some statistics on the entero results. This is making an assumption
-          #that all the tests we are running are calculating the same value, the entero
-          #amount.
-          entero_stats = None
-          if len(site_equations.tests):
-            entero_stats = stats()
-            for test in site_equations.tests:
-              if test.mlrResult is not None:
-                entero_stats.addValue(test.mlrResult)
-            entero_stats.doCalculations()
+          #Get all the models used for the particular sample site.
+          model_list = build_test_objects(config_file, site.name)
+          #Create the container for all the models.
+          site_equations = wqEquations(site.name, model_list, True)
 
-          #Check to see if there is a entero sample for our date as long as the date
-          #is not the current date.
-          entero_value = None
-          if datetime.now().date() != kwargs['begin_date'].date():
-            entero_value = check_site_date_for_sampling_date(site.name, kwargs['begin_date'], output_settings_ini)
-
-          site_model_ensemble.append({'metadata': site,
-                                      'models': site_equations,
-                                      'statistics': entero_stats,
-                                      'entero_value': entero_value})
-        except Exception,e:
+          #Get the station specific tide stations
+          tide_station = config_file.get(site.name, 'tide_station')
+          offset_tide_station = config_file.get(site.name, 'offset_tide_station')
+          #We use the virtual tide sites as there no stations near the sites.
+          tide_offset_settings = {
+            'tide_station': config_file.get(offset_tide_station, 'station_id'),
+            'hi_tide_time_offset': config_file.getint(offset_tide_station, 'hi_tide_time_offset'),
+            'lo_tide_time_offset': config_file.getint(offset_tide_station, 'lo_tide_time_offset'),
+            'hi_tide_height_offset': config_file.getfloat(offset_tide_station, 'hi_tide_height_offset'),
+            'lo_tide_height_offset': config_file.getfloat(offset_tide_station, 'lo_tide_height_offset')
+          }
+        except ConfigParser.Error, e:
           if logger:
             logger.exception(e)
+        else:
+          fl_wq_data.reset(site=site,
+                            tide_station=tide_station,
+                            tide_offset_params=tide_offset_settings)
+          #site_data = OrderedDict([('station_name',site.name)])
+          site_data['station_name'] = site.name
+          try:
+            fl_wq_data.query_data(kwargs['begin_date'], kwargs['begin_date'], site_data, reset_site_specific_data_only)
+            reset_site_specific_data_only = True
+            site_equations.runTests(site_data)
+            total_test_time = sum(testObj.test_time for testObj in site_equations.tests)
+            if logger:
+              logger.debug("Site: %s total time to execute models: %f ms" % (site.name, total_test_time * 1000))
+            total_time += total_test_time
+            #Calculate some statistics on the entero results. This is making an assumption
+            #that all the tests we are running are calculating the same value, the entero
+            #amount.
+            entero_stats = None
+            if len(site_equations.tests):
+              entero_stats = stats()
+              for test in site_equations.tests:
+                if test.mlrResult is not None:
+                  entero_stats.addValue(test.mlrResult)
+              entero_stats.doCalculations()
 
-    if logger:
-      logger.debug("Total time to execute all sites models: %f ms" % (total_time * 1000))
-    output_results(site_model_ensemble=site_model_ensemble,
-                   config_file_name=output_settings_ini,
-                   prediction_date=kwargs['begin_date'],
-                   prediction_run_date=prediction_testrun_date)
+            #Check to see if there is a entero sample for our date as long as the date
+            #is not the current date.
+            entero_value = None
+            if datetime.now().date() != kwargs['begin_date'].date():
+              entero_value = check_site_date_for_sampling_date(site.name, kwargs['begin_date'], output_settings_ini)
+
+            site_model_ensemble.append({'metadata': site,
+                                        'models': site_equations,
+                                        'statistics': entero_stats,
+                                        'entero_value': entero_value})
+          except Exception,e:
+            if logger:
+              logger.exception(e)
+
+      if logger:
+        logger.debug("Total time to execute all sites models: %f ms" % (total_time * 1000))
+      output_results(site_model_ensemble=site_model_ensemble,
+                     config_file_name=output_settings_ini,
+                     prediction_date=kwargs['begin_date'],
+                     prediction_run_date=prediction_testrun_date)
 
   return
 
