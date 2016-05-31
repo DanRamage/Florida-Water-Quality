@@ -188,7 +188,7 @@ class florida_wq_historical_data(wq_data):
     if self.logger:
       self.logger.debug("Closing connection to xenia db")
     self.xenia_db.DB.close()
-  """
+
     if self.logger:
       self.logger.debug("Closing connection to thredds endpoint.")
     self.ncObj.close()
@@ -196,6 +196,7 @@ class florida_wq_historical_data(wq_data):
     if self.logger:
       self.logger.debug("Closing connection to hycom endpoint.")
     self.hycom_model.close()
+  """
 
   def reset(self, **kwargs):
     self.site = kwargs['site']
