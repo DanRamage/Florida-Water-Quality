@@ -109,8 +109,8 @@ def check_site_date_for_sampling_date(site_name, test_date, output_settings_ini)
   return entero_value
 
 def run_wq_models(**kwargs):
-  logger = None
   logger = logging.getLogger(__name__)
+  logger.debug("run_wq_models Starting")
   prediction_testrun_date = datetime.now()
 
 
@@ -244,6 +244,8 @@ def run_wq_models(**kwargs):
                      config_file_name=output_settings_ini,
                      prediction_date=kwargs['begin_date'],
                      prediction_run_date=prediction_testrun_date)
+
+  logger.debug("run_wq_models Finished")
 
   return
 

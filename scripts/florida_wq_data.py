@@ -728,57 +728,51 @@ class florida_wq_model_data(florida_wq_historical_data):
     if self.logger:
       self.logger.debug("Connecting to thredds endpoint for c10: %s" % (kwargs['c_10_tds_url']))
     #Connect to netcdf file for retrieving data from c10 buoy. To speed up retrieval, we connect
-    try:
-      #only once and retrieve the times.
-      self.ncObj = nc.Dataset(kwargs['c_10_tds_url'])
-      self.c10_times = self.ncObj.variables[kwargs['c_10_time_var']][:]
+    #only once and retrieve the times.
+    self.ncObj = nc.Dataset(kwargs['c_10_tds_url'])
+    self.c10_times = self.ncObj.variables[kwargs['c_10_time_var']][:]
 
-      self.c10_water_temp = self.ncObj.variables[kwargs['c_10_water_temp_var']][:]
-      self.c10_water_temp_fill_value = self.ncObj.variables[kwargs['c_10_water_temp_var']]._FillValue
-      self.c10_salinity = self.ncObj.variables[kwargs['c_10_salinity_var']][:]
-      self.c10_salinity_fill_value = self.ncObj.variables[kwargs['c_10_salinity_var']]._FillValue
+    self.c10_water_temp = self.ncObj.variables[kwargs['c_10_water_temp_var']][:]
+    self.c10_water_temp_fill_value = self.ncObj.variables[kwargs['c_10_water_temp_var']]._FillValue
+    self.c10_salinity = self.ncObj.variables[kwargs['c_10_salinity_var']][:]
+    self.c10_salinity_fill_value = self.ncObj.variables[kwargs['c_10_salinity_var']]._FillValue
 
-      self.model_bbox = kwargs['model_bbox']
-      self.model_within_polygon = Polygon(kwargs['model_within_polygon'])
+    self.model_bbox = kwargs['model_bbox']
+    self.model_within_polygon = Polygon(kwargs['model_within_polygon'])
 
+    if self.logger:
+      self.logger.debug("Connecting to thredds endpoint for hycom data: %s" % (kwargs['hycom_model_tds_url']))
+    self.hycom_model = nc.Dataset(kwargs['hycom_model_tds_url'])
+
+    self.hycom_model_time = self.hycom_model.variables['MT'][:]
+    model_bbox = [float(self.model_bbox[0]),float(self.model_bbox[2]),
+                          float(self.model_bbox[1]),float(self.model_bbox[3])]
+
+    #Determine the bounding box indexes.
+    lons = self.hycom_model.variables['Longitude'][:]
+    lats = self.hycom_model.variables['Latitude'][:]
+    # latitude lower and upper index
+    self.hycom_latli = np.argmin( np.abs( lats - model_bbox[2] ) )
+    self.hycom_latui = np.argmin( np.abs( lats - model_bbox[3] ) )
+    # longitude lower and upper index
+    self.hycom_lonli = np.argmin( np.abs( lons - model_bbox[0] ) )
+    self.hycom_lonui = np.argmin( np.abs( lons - model_bbox[1] ) )
+
+    self.hycom_lon_array = self.hycom_model.variables['Longitude'][self.hycom_lonli:self.hycom_lonui]
+    self.hycom_lat_array = self.hycom_model.variables['Latitude'][self.hycom_latli:self.hycom_latui]
+
+    if self.logger:
+      self.logger.debug("Connection to xenia db: %s" % (kwargs['xenia_database_name']))
+    self.xenia_db = wqDB(kwargs['xenia_database_name'], type(self).__name__)
+
+    #Connect to the xenia database we use for observations aggregation.
+    self.xenia_obs_db = xeniaAlchemy()
+    if self.xenia_obs_db.connectDB(kwargs['xenia_obs_db_type'], kwargs['xenia_obs_db_user'], kwargs['xenia_obs_db_password'], kwargs['xenia_obs_db_host'], kwargs['xenia_obs_db_name'], False):
       if self.logger:
-        self.logger.debug("Connecting to thredds endpoint for hycom data: %s" % (kwargs['hycom_model_tds_url']))
-      self.hycom_model = nc.Dataset(kwargs['hycom_model_tds_url'])
+        self.logger.info("Succesfully connect to DB: %s at %s" %(kwargs['xenia_obs_db_name'],kwargs['xenia_obs_db_host']))
+    else:
+      self.logger.error("Unable to connect to DB: %s at %s." %(kwargs['xenia_obs_db_name'],kwargs['xenia_obs_db_host']))
 
-      self.hycom_model_time = self.hycom_model.variables['MT'][:]
-      model_bbox = [float(self.model_bbox[0]),float(self.model_bbox[2]),
-                            float(self.model_bbox[1]),float(self.model_bbox[3])]
-
-      #Determine the bounding box indexes.
-      lons = self.hycom_model.variables['Longitude'][:]
-      lats = self.hycom_model.variables['Latitude'][:]
-      # latitude lower and upper index
-      self.hycom_latli = np.argmin( np.abs( lats - model_bbox[2] ) )
-      self.hycom_latui = np.argmin( np.abs( lats - model_bbox[3] ) )
-      # longitude lower and upper index
-      self.hycom_lonli = np.argmin( np.abs( lons - model_bbox[0] ) )
-      self.hycom_lonui = np.argmin( np.abs( lons - model_bbox[1] ) )
-
-      self.hycom_lon_array = self.hycom_model.variables['Longitude'][self.hycom_lonli:self.hycom_lonui]
-      self.hycom_lat_array = self.hycom_model.variables['Latitude'][self.hycom_latli:self.hycom_latui]
-
-      if self.logger:
-        self.logger.debug("Connection to xenia db: %s" % (kwargs['xenia_database_name']))
-      self.xenia_db = wqDB(kwargs['xenia_database_name'], type(self).__name__)
-
-      #Connect to the xenia database we use for observations aggregation.
-      self.xenia_obs_db = xeniaAlchemy()
-      if self.xenia_obs_db.connectDB(kwargs['xenia_obs_db_type'], kwargs['xenia_obs_db_user'], kwargs['xenia_obs_db_password'], kwargs['xenia_obs_db_host'], kwargs['xenia_obs_db_name'], False):
-        if self.logger:
-          self.logger.info("Succesfully connect to DB: %s at %s" %(kwargs['xenia_obs_db_name'],kwargs['xenia_obs_db_host']))
-      else:
-        self.logger.error("Unable to connect to DB: %s at %s." %(kwargs['xenia_obs_db_name'],kwargs['xenia_obs_db_host']))
-
-
-    except Exception,e:
-      if self.logger:
-        self.logger.exception(e)
-      raise
 
   def __del__(self):
     florida_wq_historical_data.__del__(self)
