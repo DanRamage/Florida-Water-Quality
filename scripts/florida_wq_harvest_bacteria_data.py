@@ -367,33 +367,35 @@ def get_manatee_county_data(config_filename, fl_sites, data_dict):
   #page.
   swim_adv = florida_wq_advisory('manatee', config_filename)
   advisories = swim_adv.get_advisories()
-  advisories_date = advisories[0]['date']
-  sample_data = {}
-  for advisory in advisories:
-    #An advisory occurs when the etcoc value is 104 or greater, so if the
-    #advisory data we downloaded has an advisory issued, the bacteria count
-    #has to be at least 104.
-    logger.debug("Processing site: %s Date: %s advisory: %d" % (advisory['site_name'], advisory['date'], advisory['advisory']))
-    value = 0
-    if advisory['advisory']:
-      value = 104
-    sample_data[advisory['site_name']] = {
-      'sample_date': advisory['date'],
-      'value': value
-    }
-    sample_date = advisory['date']
-    if sample_date.date() not in data_dict:
-      data_dict[sample_date.date()] = {}
+  if len(advisories):
+    advisories_date = advisories[0]['date']
+    sample_data = {}
+    for advisory in advisories:
+      #An advisory occurs when the etcoc value is 104 or greater, so if the
+      #advisory data we downloaded has an advisory issued, the bacteria count
+      #has to be at least 104.
+      logger.debug("Processing site: %s Date: %s advisory: %d" % (advisory['site_name'], advisory['date'], advisory['advisory']))
+      value = 0
+      if advisory['advisory']:
+        value = 104
+      sample_data[advisory['site_name']] = {
+        'sample_date': advisory['date'],
+        'value': value
+      }
+      sample_date = advisory['date']
+      if sample_date.date() not in data_dict:
+        data_dict[sample_date.date()] = {}
 
-    rec = data_dict[sample_date.date()]
-    rec[advisory['site_name']] = {
-      'sample_date': advisory['date'],
-      'value': value
-    }
+      rec = data_dict[sample_date.date()]
+      rec[advisory['site_name']] = {
+        'sample_date': advisory['date'],
+        'value': value
+      }
 
-  results.append({'sample_date': advisories_date,
-                  'sample_data': sample_data})
-
+    results.append({'sample_date': advisories_date,
+                    'sample_data': sample_data})
+  else:
+    logger.error("No advisories returned.")
   return results
 def main():
   parser = optparse.OptionParser()
@@ -438,7 +440,7 @@ def main():
 
       data_dict = {}
       sarasota_results = get_sarasota_county_data(options.config_file, data_dict)
-      #manatee_results = get_manatee_county_data(options.config_file, fl_sites, data_dict)
+      manatee_results = get_manatee_county_data(options.config_file, fl_sites, data_dict)
 
       date_keys = data_dict.keys()
       #date_keys.sort()
