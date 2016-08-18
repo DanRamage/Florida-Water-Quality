@@ -13,6 +13,7 @@ from collections import OrderedDict
 from mako.template import Template
 from mako import exceptions as makoExceptions
 import simplejson as json
+from yapsy.PluginManager import PluginManager
 
 from wq_prediction_tests import wqEquations
 from enterococcus_wq_test import EnterococcusPredictionTest
@@ -144,6 +145,7 @@ def run_wq_models(**kwargs):
     #output results config file. Again split out into individual ini file
     #for security.
     output_settings_ini = config_file.get('output_results', 'settings_ini')
+    output_plugin_dirs = config_file.get('output_plugins', 'plugin_directories').split(',')
 
   except ConfigParser.Error, e:
     if logger:
@@ -240,15 +242,46 @@ def run_wq_models(**kwargs):
 
       if logger:
         logger.debug("Total time to execute all sites models: %f ms" % (total_time * 1000))
+
+      run_output_plugins(output_plugin_directories=output_plugin_dirs,
+                          site_model_ensemble=site_model_ensemble,
+                           prediction_date=kwargs['begin_date'],
+                           prediction_run_date=prediction_testrun_date)
+      """
       output_results(site_model_ensemble=site_model_ensemble,
                      config_file_name=output_settings_ini,
                      prediction_date=kwargs['begin_date'],
                      prediction_run_date=prediction_testrun_date)
-
+      """
   logger.debug("run_wq_models Finished")
 
   return
 
+
+
+def run_output_plugins(**kwargs):
+  logger = logging.getLogger(__name__)
+  if logger:
+    logger.info("Begin loading plugins")
+
+  simplePluginManager = PluginManager()
+  logging.getLogger('yapsy').setLevel(logging.DEBUG)
+
+  # Tell it the default place(s) where to find plugins
+  if logger:
+    logger.debug("Plugin directories: %s" % (kwargs['output_plugin_directories']))
+  simplePluginManager.setPluginPlaces(kwargs['output_plugin_directories'])
+
+  simplePluginManager.collectPlugins()
+
+  for plugin in simplePluginManager.getAllPlugins():
+    if logger:
+      logger.info("Starting plugin: %s" % (plugin.name))
+    plugin.plugin_object.initialize_plugin(details=plugin.details)
+    plugin.plugin_object.emit(prediction_date=kwargs['prediction_date'].astimezone(timezone("US/Eastern")).strftime("%Y-%m-%d %H:%M:%S"),
+                              execution_date=kwargs['prediction_run_date'].strftime("%Y-%m-%d %H:%M:%S"),
+                              ensemble_tests=kwargs['site_model_ensemble'])
+"""
 def output_results(**kwargs):
   logger = logging.getLogger('output_results_logger')
   logger.debug("Starting output_results")
@@ -269,7 +302,7 @@ def output_results(**kwargs):
   if logger:
     logger.debug("Finished output_results")
   return
-
+"""
 def main():
   parser = optparse.OptionParser()
   parser.add_option("-c", "--ConfigFile", dest="config_file",
