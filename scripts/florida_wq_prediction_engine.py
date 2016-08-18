@@ -261,8 +261,7 @@ def run_wq_models(**kwargs):
 
 def run_output_plugins(**kwargs):
   logger = logging.getLogger(__name__)
-  if logger:
-    logger.info("Begin loading plugins")
+  logger.info("Begin run_output_plugins")
 
   simplePluginManager = PluginManager()
   logging.getLogger('yapsy').setLevel(logging.DEBUG)
@@ -281,6 +280,7 @@ def run_output_plugins(**kwargs):
     plugin.plugin_object.emit(prediction_date=kwargs['prediction_date'].astimezone(timezone("US/Eastern")).strftime("%Y-%m-%d %H:%M:%S"),
                               execution_date=kwargs['prediction_run_date'].strftime("%Y-%m-%d %H:%M:%S"),
                               ensemble_tests=kwargs['site_model_ensemble'])
+  logger.info("Finished run_output_plugins")
 """
 def output_results(**kwargs):
   logger = logging.getLogger('output_results_logger')
