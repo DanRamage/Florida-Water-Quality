@@ -21,6 +21,7 @@ from enterococcus_wq_test import EnterococcusPredictionTest
 from florida_wq_data import florida_wq_model_data, florida_sample_sites
 from wq_results import _resolve, results_exporter
 from stats import stats
+from output_plugin import output_plugin
 '''
 Function: build_test_objects
 Purpose: Builds the models used for doing the predictions.
@@ -265,6 +266,9 @@ def run_output_plugins(**kwargs):
 
   simplePluginManager = PluginManager()
   logging.getLogger('yapsy').setLevel(logging.DEBUG)
+  simplePluginManager.setCategoriesFilter({
+     "OutputResults": output_plugin
+     })
 
   # Tell it the default place(s) where to find plugins
   if logger:
