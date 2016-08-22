@@ -440,7 +440,7 @@ def main():
 
       data_dict = {}
       sarasota_results = get_sarasota_county_data(options.config_file, data_dict)
-      manatee_results = get_manatee_county_data(options.config_file, fl_sites, data_dict)
+      #manatee_results = get_manatee_county_data(options.config_file, fl_sites, data_dict)
 
       date_keys = data_dict.keys()
       #date_keys.sort()
