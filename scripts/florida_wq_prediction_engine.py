@@ -6,12 +6,10 @@ import logging.config
 from datetime import datetime, timedelta
 from pytz import timezone
 import traceback
-
+import time
 import optparse
 import ConfigParser
 from collections import OrderedDict
-from mako.template import Template
-from mako import exceptions as makoExceptions
 import simplejson as json
 from yapsy.PluginManager import PluginManager
 
@@ -19,7 +17,6 @@ from wq_prediction_tests import wqEquations
 from enterococcus_wq_test import EnterococcusPredictionTest
 
 from florida_wq_data import florida_wq_model_data, florida_sample_sites
-from wq_results import _resolve, results_exporter
 from stats import stats
 from output_plugin import output_plugin
 '''
@@ -277,13 +274,19 @@ def run_output_plugins(**kwargs):
 
   simplePluginManager.collectPlugins()
 
+  plugin_cnt = 0
+  plugin_start_time = time.time()
   for plugin in simplePluginManager.getAllPlugins():
     if logger:
       logger.info("Starting plugin: %s" % (plugin.name))
-    plugin.plugin_object.initialize_plugin(details=plugin.details)
-    plugin.plugin_object.emit(prediction_date=kwargs['prediction_date'].astimezone(timezone("US/Eastern")).strftime("%Y-%m-%d %H:%M:%S"),
-                              execution_date=kwargs['prediction_run_date'].strftime("%Y-%m-%d %H:%M:%S"),
-                              ensemble_tests=kwargs['site_model_ensemble'])
+    if plugin.plugin_object.initialize_plugin(details=plugin.details):
+      plugin.plugin_object.emit(prediction_date=kwargs['prediction_date'].astimezone(timezone("US/Eastern")).strftime("%Y-%m-%d %H:%M:%S"),
+                                execution_date=kwargs['prediction_run_date'].strftime("%Y-%m-%d %H:%M:%S"),
+                                ensemble_tests=kwargs['site_model_ensemble'])
+      plugin_cnt += 1
+    else:
+      logger.error("Failed to initialize plugin: %s" % (plugin.details))
+  logger.debug("%d output plugins run in %f seconds" % (plugin_cnt, time.time() - plugin_start_time))
   logger.info("Finished run_output_plugins")
 """
 def output_results(**kwargs):
