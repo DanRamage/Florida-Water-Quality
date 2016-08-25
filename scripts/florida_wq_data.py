@@ -1024,24 +1024,26 @@ class florida_wq_model_data(florida_wq_historical_data):
               #Vector with speed as constant(1), and direction.
               direction_tuples.append((1, wind_dir_row.m_value))
               break
+        if len(wind_dir_tuples):
+          avg_speed_dir_components = calcAvgSpeedAndDir(wind_dir_tuples)
+          if self.logger:
+            self.logger.debug("Platform: %s Avg Wind Speed: %f(m_s-1) %f(mph) Direction: %f" % (platform_handle,
+                                                                                              avg_speed_dir_components[0],
+                                                                                              avg_speed_dir_components[0] * meters_per_second_to_mph,
+                                                                                              avg_speed_dir_components[1]))
 
-        avg_speed_dir_components = calcAvgSpeedAndDir(wind_dir_tuples)
-        if self.logger:
-          self.logger.debug("Platform: %s Avg Wind Speed: %f(m_s-1) %f(mph) Direction: %f" % (platform_handle,
-                                                                                            avg_speed_dir_components[0],
-                                                                                            avg_speed_dir_components[0] * meters_per_second_to_mph,
-                                                                                            avg_speed_dir_components[1]))
-
-        #Unity components, just direction with speeds all 1.
-        avg_dir_components = calcAvgSpeedAndDir(direction_tuples)
-        scalar_speed_avg = scalar_speed_avg / speed_count
-        wq_tests_data['nws_ksrq_avg_wspd'] = scalar_speed_avg * meters_per_second_to_mph
-        wq_tests_data['nws_ksrq_avg_wdir'] = avg_dir_components[1]
-        if self.logger:
-          self.logger.debug("Platform: %s Avg Scalar Wind Speed: %f(m_s-1) %f(mph) Direction: %f" % (platform_handle,
-                                                                                                   scalar_speed_avg,
-                                                                                                   scalar_speed_avg * meters_per_second_to_mph,
-                                                                                                   avg_dir_components[1]))
+          #Unity components, just direction with speeds all 1.
+          avg_dir_components = calcAvgSpeedAndDir(direction_tuples)
+          scalar_speed_avg = scalar_speed_avg / speed_count
+          wq_tests_data['nws_ksrq_avg_wspd'] = scalar_speed_avg * meters_per_second_to_mph
+          wq_tests_data['nws_ksrq_avg_wdir'] = avg_dir_components[1]
+          if self.logger:
+            self.logger.debug("Platform: %s Avg Scalar Wind Speed: %f(m_s-1) %f(mph) Direction: %f" % (platform_handle,
+                                                                                                     scalar_speed_avg,
+                                                                                                     scalar_speed_avg * meters_per_second_to_mph,
+                                                                                                     avg_dir_components[1]))
+        else:
+          self.logger.error("Platform %s returned no wind speed/direction data." % (platform_handle))
 
       if self.logger:
         self.logger.debug("Finished retrieving nws platform: %s datetime: %s" % (platform_handle, start_date.strftime('%Y-%m-%d %H:%M:%S')))
