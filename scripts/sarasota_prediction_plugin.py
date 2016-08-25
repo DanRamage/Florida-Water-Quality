@@ -12,7 +12,7 @@ from florida_wq_prediction_engine import run_wq_models
 
 class sarasota_prediction_plugin(wq_prediction_engine_plugin):
 
-  def inititalize_plugin(self, **kwargs):
+  def initialize_plugin(self, **kwargs):
     #self.logger.debug("inititalize_plugin Started")
     self.config_file = kwargs['ini']
     self.process_dates = kwargs.get('process_date', None)
