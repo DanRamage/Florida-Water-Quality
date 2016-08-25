@@ -8,7 +8,7 @@ import logging.config
 import ConfigParser
 
 from wq_prediction_plugin import wq_prediction_engine_plugin
-from florida_wq_prediction_engine import run_wq_models
+from florida_wq_prediction_engine import fl_prediction_engine
 
 class sarasota_prediction_plugin(wq_prediction_engine_plugin):
 
@@ -54,8 +54,13 @@ class sarasota_prediction_plugin(wq_prediction_engine_plugin):
 
     try:
       for process_date in dates_to_process:
-        run_wq_models(begin_date=process_date,
-                      config_file_name=self.config_file)
+        fl_engine = fl_prediction_engine()
+        fl_engine.run_wq_models(begin_date=process_date,
+                                config_file_name=self.config_file)
+
+        #run_wq_models(begin_date=process_date,
+        #              config_file_name=self.config_file)
+
     except Exception, e:
       logger.exception(e)
     logger.debug("run_wq_models Finished")
