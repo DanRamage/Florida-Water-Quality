@@ -388,6 +388,10 @@ class fl_prediction_engine(wq_prediction_engine):
       config_file = ConfigParser.RawConfigParser()
       config_file.read(kwargs['config_file_name'])
 
+      data_collector_plugin_directories=config_file.get('data_collector_plugins', 'plugin_directories').split(',')
+
+      self.collect_data(data_collector_plugin_directories=data_collector_plugin_directories)
+
       boundaries_location_file = config_file.get('boundaries_settings', 'boundaries_file')
       sites_location_file = config_file.get('boundaries_settings', 'sample_sites')
       xenia_wq_db_file = config_file.get('database', 'name')
@@ -506,7 +510,7 @@ class fl_prediction_engine(wq_prediction_engine):
 
         self.logger.debug("Total time to execute all sites models: %f ms" % (total_time * 1000))
 
-        self.run_output_plugins(output_plugin_directories=output_plugin_dirs,
+        self.output_results(output_plugin_directories=output_plugin_dirs,
                             site_model_ensemble=site_model_ensemble,
                              prediction_date=kwargs['begin_date'],
                              prediction_run_date=prediction_testrun_date)
