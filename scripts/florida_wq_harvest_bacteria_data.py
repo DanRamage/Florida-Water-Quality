@@ -144,6 +144,17 @@ def build_feature(site, sample_date, values, logger):
   logger.debug("Starting build_feature_logger")
   logger.debug("Adding feature site: %s Desc: %s" % (site.name, site.description))
 
+  beachadvisories = {
+    'date': '',
+    'station': site.name,
+    'value': ''
+  }
+  if len(values):
+    beachadvisories = {
+      'date': sample_date,
+      'station': site.name,
+      'value': values
+    }
   feature = {
     'type': 'Feature',
     'geometry': {
@@ -159,11 +170,7 @@ def build_feature(site, sample_date, values, logger):
       'desc': site.description,
       'len': '',
       'test': {
-        'beachadvisories': {
-          'date': sample_date,
-          'station': site.name,
-          'value': values
-        }
+        'beachadvisories': beachadvisories
       }
     }
   }
@@ -207,11 +214,13 @@ def build_current_file(data_dict, date_keys, config_file, fl_sites, build_missin
         #Build the json structure the web app is going to use.
         station_data = bacteria_data[site.description.lower()]
         if isinstance(station_data['value'], int) or isinstance(station_data['value'], long):
-          values = station_data['value']
+          values = str(station_data['value'])
         else:
           values = station_data['value'].split(';')
-          values = [int(val.strip()) for val in values]
+          #values = [int(val.strip()) for val in values]
+          values = [val.strip() for val in values]
       elif build_missing:
+        #values = None
         values = []
 
       if values is not None:
@@ -255,10 +264,11 @@ def build_station_file(bacteria_data, data_date, config_file, fl_sites, build_mi
         station_data = bacteria_data[site.description.lower()]
 
         if isinstance(station_data['value'], int) or isinstance(station_data['value'], long):
-          values = station_data['value']
+          values = str(station_data['value'])
         else:
           values = station_data['value'].split(';')
-          values = [int(val.strip()) for val in values]
+          #values = [int(val.strip()) for val in values]
+          values = [val.strip() for val in values]
       elif build_missing:
         values = []
         logger.debug("Site: %s not found in bacteria data" % (site.description.lower()))
@@ -269,30 +279,36 @@ def build_station_file(bacteria_data, data_date, config_file, fl_sites, build_mi
         #Now find if we have the station file already, if not we create it.
         station_filename = os.path.join(station_results_directory, '%s.json' % (site.name))
 
-        test_data = {
-          #'date': station_data['sample_date'].strftime('%Y-%m-%d %H:%M:%S'),
-          'date': data_date.strftime('%Y-%m-%d %H:%M:%S'),
-          'station': site.name,
-          'value': values
-        }
+        test_data = None
+        if len(values):
+          test_data = {
+            #'date': station_data['sample_date'].strftime('%Y-%m-%d %H:%M:%S'),
+            'date': data_date.strftime('%Y-%m-%d %H:%M:%S'),
+            'station': site.name,
+            'value': values
+          }
         #Do we have a station file already, if so get the data.
         if os.path.isfile(station_filename):
-          try:
-            logger.debug("Opening station JSON file: %s" % (station_filename))
-            with open(station_filename, 'r') as station_json_file:
-              feature = json.loads(station_json_file.read())
-              beachadvisories = feature['properties']['test']['beachadvisories']
-              #Make sure the date is not already in the list.
-              if not contains(beachadvisories, lambda x: x['date'] == test_data['date']):
-                if logger:
-                  logger.debug("Station: %s adding date: %s" % (site.name, test_data['date']))
-                beachadvisories.append(test_data)
-                beachadvisories.sort(key=lambda x: x['date'], reverse=False)
-          except (json.JSONDecodeError, IOError, Exception) as e:
-            if logger:
-              logger.exception(e)
+          if test_data is not None:
+            try:
+              logger.debug("Opening station JSON file: %s" % (station_filename))
+              with open(station_filename, 'r') as station_json_file:
+                feature = json.loads(station_json_file.read())
+                beachadvisories = feature['properties']['test']['beachadvisories']
+                #Make sure the date is not already in the list.
+                if not contains(beachadvisories, lambda x: x['date'] == test_data['date']):
+                  if logger:
+                    logger.debug("Station: %s adding date: %s" % (site.name, test_data['date']))
+                  beachadvisories.append(test_data)
+                  beachadvisories.sort(key=lambda x: x['date'], reverse=False)
+            except (json.JSONDecodeError, IOError, Exception) as e:
+              if logger:
+                logger.exception(e)
         #No file, so let's create the station data
         else:
+          beachadvisories = []
+          if test_data is not None:
+            beachadvisories = [test_data]
           feature = {
             'type': 'Feature',
             'geometry': {
@@ -308,7 +324,7 @@ def build_station_file(bacteria_data, data_date, config_file, fl_sites, build_mi
               'desc': site.description,
               'len': '',
               'test': {
-                'beachadvisories': [test_data]
+                'beachadvisories': beachadvisories
               }
             }
           }
