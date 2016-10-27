@@ -292,18 +292,19 @@ def build_station_file(bacteria_data, data_date, config_file, fl_sites, build_mi
           if test_data is not None:
             try:
               logger.debug("Opening station JSON file: %s" % (station_filename))
-              with open(station_filename, 'r') as station_json_file:
+              with open(station_filename, 'r') as station_jsonBab_file:
                 feature = json.loads(station_json_file.read())
-                if 'beachadvisories' in feature['properties']['test']:
-                  beachadvisories = feature['properties']['test']['beachadvisories']
-                else:
-                  beachadvisories = []
-                #Make sure the date is not already in the list.
-                if not contains(beachadvisories, lambda x: x['date'] == test_data['date']):
-                  if logger:
-                    logger.debug("Station: %s adding date: %s" % (site.name, test_data['date']))
-                  beachadvisories.append(test_data)
-                  beachadvisories.sort(key=lambda x: x['date'], reverse=False)
+                if feature is not None:
+                  if 'beachadvisories' in feature['properties']['test']:
+                    beachadvisories = feature['properties']['test']['beachadvisories']
+                  else:
+                    beachadvisories = []
+                  #Make sure the date is not already in the list.
+                  if not contains(beachadvisories, lambda x: x['date'] == test_data['date']):
+                    if logger:
+                      logger.debug("Station: %s adding date: %s" % (site.name, test_data['date']))
+                    beachadvisories.append(test_data)
+                    beachadvisories.sort(key=lambda x: x['date'], reverse=False)
             except (json.JSONDecodeError, IOError, Exception) as e:
               if logger:
                 logger.exception(e)
