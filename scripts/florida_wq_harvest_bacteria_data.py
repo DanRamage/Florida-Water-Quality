@@ -294,7 +294,10 @@ def build_station_file(bacteria_data, data_date, config_file, fl_sites, build_mi
               logger.debug("Opening station JSON file: %s" % (station_filename))
               with open(station_filename, 'r') as station_json_file:
                 feature = json.loads(station_json_file.read())
-                beachadvisories = feature['properties']['test']['beachadvisories']
+                if 'beachadvisories' in beachadvisories:
+                  beachadvisories = feature['properties']['test']['beachadvisories']
+                else:
+                  beachadvisories = []
                 #Make sure the date is not already in the list.
                 if not contains(beachadvisories, lambda x: x['date'] == test_data['date']):
                   if logger:
