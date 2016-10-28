@@ -292,7 +292,7 @@ def build_station_file(bacteria_data, data_date, config_file, fl_sites, build_mi
           if test_data is not None:
             try:
               logger.debug("Opening station JSON file: %s" % (station_filename))
-              with open(station_filename, 'r') as station_jsonBab_file:
+              with open(station_filename, 'r') as station_json_file:
                 feature = json.loads(station_json_file.read())
                 if feature is not None:
                   if 'test' in feature['properties']:
