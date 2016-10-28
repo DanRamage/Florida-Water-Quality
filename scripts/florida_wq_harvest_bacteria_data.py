@@ -334,10 +334,13 @@ def build_station_file(bacteria_data, data_date, config_file, fl_sites, build_mi
             }
           }
         try:
-          with open(station_filename, 'w') as station_json_file:
-            feature_json = json.dumps(feature)
-            logger.debug("Feature: %s" % (feature_json))
-            station_json_file.write(feature_json)
+          if feature is not None:
+            with open(station_filename, 'w') as station_json_file:
+              feature_json = json.dumps(feature)
+              logger.debug("Feature: %s" % (feature_json))
+              station_json_file.write(feature_json)
+          else:
+            logger.debug("Feature is None")
         except (json.JSONDecodeError, IOError) as e:
           if logger:
             logger.exception(e)
