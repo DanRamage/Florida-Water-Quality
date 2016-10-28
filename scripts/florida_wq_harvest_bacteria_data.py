@@ -278,7 +278,7 @@ def build_station_file(bacteria_data, data_date, config_file, fl_sites, build_mi
         feature = None
         #Now find if we have the station file already, if not we create it.
         station_filename = os.path.join(station_results_directory, '%s.json' % (site.name))
-
+        logger.debug("Processing station file: %s" % (station_filename))
         test_data = None
         if len(values):
           test_data = {
