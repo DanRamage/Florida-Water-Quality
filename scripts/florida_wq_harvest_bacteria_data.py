@@ -310,6 +310,7 @@ def build_station_file(bacteria_data, data_date, config_file, fl_sites, build_mi
                 logger.exception(e)
         #No file, so let's create the station data
         else:
+          logger.debug("Creating station JSON file: %s" % (station_filename))
           beachadvisories = []
           if test_data is not None:
             beachadvisories = [test_data]
