@@ -519,7 +519,16 @@ class florida_wq_historical_data(wq_data):
       #Date/Time format for the NOAA is YYYYMMDD
 
       try:
+        """
         tide_data = tide.calcTideRange(beginDate = tide_start_time,
+                           endDate = tide_end_time,
+                           station=self.tide_station,
+                           datum='MLLW',
+                           units='feet',
+                           timezone='GMT',
+                           smoothData=False)
+        """
+        tide_data = tide.calcTideRangeExt(beginDate = tide_start_time,
                            endDate = tide_end_time,
                            station=self.tide_station,
                            datum='MLLW',
