@@ -17,7 +17,7 @@ from wqHistoricalData import wq_data
 from wqXMRGProcessing import wqDB
 from wqHistoricalData import station_geometry,sampling_sites, wq_defines, geometry_list
 from date_time_utils import get_utc_epoch
-from NOAATideData import noaaTideDataExt
+from NOAATideData import noaaTideData
 from xeniaSQLAlchemy import xeniaAlchemy, multi_obs
 from stats import calcAvgSpeedAndDir
 from romsTools import closestCellFromPtInPolygon
@@ -515,12 +515,12 @@ class florida_wq_historical_data(wq_data):
       tide_start_time = (start_date - timedelta(hours=24))
       tide_end_time = start_date
 
-      #tide = noaaTideData(use_raw=True, logger=self.logger)
-      tide = noaaTideDataExt(use_raw=True, logger=self.logger)
+      tide = noaaTideData(use_raw=True, logger=self.logger)
+      #tide = noaaTideDataExt(use_raw=True, logger=self.logger)
       #Date/Time format for the NOAA is YYYYMMDD
 
       try:
-        """
+
         tide_data = tide.calcTideRange(beginDate = tide_start_time,
                            endDate = tide_end_time,
                            station=self.tide_station,
@@ -536,7 +536,7 @@ class florida_wq_historical_data(wq_data):
                            units='feet',
                            timezone='GMT',
                            smoothData=False)
-
+        """
       except Exception,e:
         if self.logger:
           self.logger.exception(e)
