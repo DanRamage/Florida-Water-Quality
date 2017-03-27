@@ -885,7 +885,6 @@ class florida_wq_model_data(florida_wq_historical_data):
 
     self.initialize_return_data(wq_tests_data, reset_site_specific_data_only)
 
-    """
     #If we are resetting only the site specific data, no need to re-query these.
     if not reset_site_specific_data_only:
       self.get_nws_data(start_date, wq_tests_data)
@@ -894,7 +893,7 @@ class florida_wq_model_data(florida_wq_historical_data):
     self.get_tide_data(start_date, wq_tests_data)
     self.get_nexrad_data(start_date, wq_tests_data)
     self.get_hycom_model_data(start_date, wq_tests_data)
-    """
+
     if self.logger:
       self.logger.debug("Site: %s Finished query data for datetime: %s" % (self.site.name, start_date))
 
