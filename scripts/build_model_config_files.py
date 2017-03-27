@@ -99,6 +99,7 @@ def main():
                 for vb_replacement in VB_FUNCTIONS_REPLACE:
                   formula_string = formula_string.replace(vb_replacement[0], vb_replacement[1])
                 model_config_parser.set(model_section, 'formula', formula_string)
+                model_config_parser.set(model_section, "enabled", True)
                 model_count += 1
 
               line_num += 1
