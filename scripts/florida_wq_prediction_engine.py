@@ -338,9 +338,13 @@ class fl_prediction_engine(wq_prediction_engine):
       for cnt in range(model_count):
         model_name = model_config_file.get("model_%d" % (cnt+1), "name")
         model_equation = model_config_file.get("model_%d" % (cnt+1), "formula")
-        self.logger.debug("Site: %s Model name: %s equation: %s" % (site_name, model_name, model_equation))
+        model_enabled = model_config_file.get("model_%d" % (cnt+1), "enabled")
+        self.logger.debug("Site: %s Model name: %s equation: %s Enabled: %s" % (site_name, model_name, model_equation, model_enabled))
 
-        test_obj = EnterococcusPredictionTest(model_equation, site_name, model_name)
+        test_obj = EnterococcusPredictionTest(formula=model_equation,
+                                              site_name=site_name,
+                                              model_name=model_name,
+                                              model_enabled=model_enabled)
         test_obj.set_category_limits(entero_lo_limit, entero_hi_limit)
         model_list.append(test_obj)
 

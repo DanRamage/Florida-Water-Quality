@@ -50,7 +50,9 @@ class florida_wq_advisory(object):
           driver = webdriver.Firefox()
         #Otherwise we go headless.
         else:
-          driver = webdriver.PhantomJS('phantomjs')
+          #driver = webdriver.PhantomJS('phantomjs')
+          driver = webdriver.PhantomJS(executable_path='/usr/local/Cellar/phantomjs/2.1.1/bin/phantomjs')
+
         driver.get(self.page_url)
         cookie = driver.get_cookie('cbParamList')
         page = requests.get(self.page_url)
