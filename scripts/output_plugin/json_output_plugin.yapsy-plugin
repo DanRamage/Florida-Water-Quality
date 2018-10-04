@@ -1,0 +1,17 @@
+[Core]
+Name = WQ JSON File Plugin
+Module = json_output_plugin
+
+[Documentation]
+Author = Dan Ramage
+Version = 0.1
+Website = http://howsthebeach.org
+Description = Sarasota/Manatee specific water quality processing.
+
+[Settings]
+json_outfile=/mnt/wq_feeds/fl_wq/Predictions.json
+
+[site_message]
+severity=
+message=
+
