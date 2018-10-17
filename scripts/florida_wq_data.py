@@ -139,46 +139,53 @@ class florida_wq_historical_data(wq_data):
     self.tide_offset_settings =  None
     self.tide_data_obj = None
 
-    if self.logger:
+    try:
+      start_time = time.time()
       self.logger.debug("Connecting to thredds endpoint for c10: %s" % (kwargs['c_10_tds_url']))
-    #Connect to netcdf file for retrieving data from c10 buoy. To speed up retrieval, we connect
-    #only once and retrieve the times.
-    self.ncObj = nc.Dataset(kwargs['c_10_tds_url'])
-    self.c10_times = self.ncObj.variables['time'][:]
+      #Connect to netcdf file for retrieving data from c10 buoy. To speed up retrieval, we connect
+      #only once and retrieve the times.
+      self.ncObj = nc.Dataset(kwargs['c_10_tds_url'])
+      self.logger.debug("Connected to thredds endpoint for c10 in %f seconds" % (time.time()-start_time))
+      self.c10_times = self.ncObj.variables['time'][:]
 
-    #Salinity before 2012-11-01 23:00:00
-    self.c10_time_break = timezone('UTC').localize(datetime.strptime('2012-11-01 23:00:00', '%Y-%m-%d %H:%M:%S'))
-    self.c10_water_temp_04 = self.ncObj.variables['temperature_04'][:]
-    self.c10_salinity_04 = self.ncObj.variables['salinity_04'][:]
+      #Salinity before 2012-11-01 23:00:00
+      self.c10_time_break = timezone('UTC').localize(datetime.strptime('2012-11-01 23:00:00', '%Y-%m-%d %H:%M:%S'))
+      self.c10_water_temp_04 = self.ncObj.variables['temperature_04'][:]
+      self.c10_salinity_04 = self.ncObj.variables['salinity_04'][:]
 
-    #Salinity aftter 2012-11-01 23:00:00
-    self.c10_water_temp_01 = self.ncObj.variables['temperature_01'][:]
-    self.c10_salinity_01 = self.ncObj.variables['salinity_01'][:]
+      #Salinity aftter 2012-11-01 23:00:00
+      self.c10_water_temp_01 = self.ncObj.variables['temperature_01'][:]
+      self.c10_salinity_01 = self.ncObj.variables['salinity_01'][:]
+    except Exception as e:
+      logger.exception(e)
 
     self.model_bbox = kwargs['model_bbox']
     self.model_within_polygon = Polygon(kwargs['model_within_polygon'])
 
-
-    if self.logger:
+    try:
+      start_time = time.time()
       self.logger.debug("Connecting to thredds endpoint for hycom data: %s" % (kwargs['hycom_model_tds_url']))
-    self.hycom_model = nc.Dataset(kwargs['hycom_model_tds_url'])
+      self.hycom_model = nc.Dataset(kwargs['hycom_model_tds_url'])
+      self.logger.debug("Connected to thredds endpoint for hycom in %f seconds" % (time.time()-start_time))
 
-    self.hycom_model_time = self.hycom_model.variables['MT'][:]
-    model_bbox = [float(self.model_bbox[0]),float(self.model_bbox[2]),
-                          float(self.model_bbox[1]),float(self.model_bbox[3])]
+      self.hycom_model_time = self.hycom_model.variables['MT'][:]
+      model_bbox = [float(self.model_bbox[0]),float(self.model_bbox[2]),
+                            float(self.model_bbox[1]),float(self.model_bbox[3])]
 
-    #Determine the bounding box indexes.
-    lons = self.hycom_model.variables['Longitude'][:]
-    lats = self.hycom_model.variables['Latitude'][:]
-    # latitude lower and upper index
-    self.hycom_latli = np.argmin( np.abs( lats - model_bbox[2] ) )
-    self.hycom_latui = np.argmin( np.abs( lats - model_bbox[3] ) )
-    # longitude lower and upper index
-    self.hycom_lonli = np.argmin( np.abs( lons - model_bbox[0] ) )
-    self.hycom_lonui = np.argmin( np.abs( lons - model_bbox[1] ) )
+      #Determine the bounding box indexes.
+      lons = self.hycom_model.variables['Longitude'][:]
+      lats = self.hycom_model.variables['Latitude'][:]
+      # latitude lower and upper index
+      self.hycom_latli = np.argmin( np.abs( lats - model_bbox[2] ) )
+      self.hycom_latui = np.argmin( np.abs( lats - model_bbox[3] ) )
+      # longitude lower and upper index
+      self.hycom_lonli = np.argmin( np.abs( lons - model_bbox[0] ) )
+      self.hycom_lonui = np.argmin( np.abs( lons - model_bbox[1] ) )
 
-    self.hycom_lon_array = self.hycom_model.variables['Longitude'][self.hycom_lonli:self.hycom_lonui]
-    self.hycom_lat_array = self.hycom_model.variables['Latitude'][self.hycom_latli:self.hycom_latui]
+      self.hycom_lon_array = self.hycom_model.variables['Longitude'][self.hycom_lonli:self.hycom_lonui]
+      self.hycom_lat_array = self.hycom_model.variables['Latitude'][self.hycom_latli:self.hycom_latui]
+    except Exception as e:
+      logger.exception(e)
 
     if self.logger:
       self.logger.debug("Connection to xenia db: %s" % (kwargs['xenia_database_name']))
