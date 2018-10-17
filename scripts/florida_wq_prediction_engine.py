@@ -393,8 +393,9 @@ class fl_prediction_engine(wq_prediction_engine):
       config_file.read(kwargs['config_file_name'])
 
       data_collector_plugin_directories=config_file.get('data_collector_plugins', 'plugin_directories').split(',')
-
-      self.collect_data(data_collector_plugin_directories=data_collector_plugin_directories)
+      data_collector_plugins_enable=config_file.getboolean('data_collector_plugins', 'enable')
+      if data_collector_plugins_enable:
+        self.collect_data(data_collector_plugin_directories=data_collector_plugin_directories)
 
       boundaries_location_file = config_file.get('boundaries_settings', 'boundaries_file')
       sites_location_file = config_file.get('boundaries_settings', 'sample_sites')
@@ -423,6 +424,7 @@ class fl_prediction_engine(wq_prediction_engine):
       #for security.
       output_settings_ini = config_file.get('output_results', 'settings_ini')
       output_plugin_dirs = config_file.get('output_plugins', 'plugin_directories').split(',')
+      output_plugins_enable=config_file.getboolean('output_plugins', 'enable')
 
     except ConfigParser.Error, e:
       self.logger.exception(e)
@@ -513,11 +515,11 @@ class fl_prediction_engine(wq_prediction_engine):
               self.logger.exception(e)
 
         self.logger.debug("Total time to execute all sites models: %f ms" % (total_time * 1000))
-
-        self.output_results(output_plugin_directories=output_plugin_dirs,
-                            site_model_ensemble=site_model_ensemble,
-                             prediction_date=kwargs['begin_date'],
-                             prediction_run_date=prediction_testrun_date)
+        if output_plugins_enable:
+          self.output_results(output_plugin_directories=output_plugin_dirs,
+                              site_model_ensemble=site_model_ensemble,
+                               prediction_date=kwargs['begin_date'],
+                               prediction_run_date=prediction_testrun_date)
     self.logger.debug("run_wq_models Finished")
 
     return
