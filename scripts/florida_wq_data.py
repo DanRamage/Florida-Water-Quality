@@ -5,6 +5,7 @@ import logging.config
 
 from datetime import datetime, timedelta
 from pytz import timezone
+import time
 from shapely.geometry import Polygon
 import logging.config
 
@@ -324,6 +325,7 @@ class florida_wq_historical_data(wq_data):
     return
 
   def get_hycom_model_data(self, start_date, wq_tests_data):
+    start_time = time.time()
     if self.logger:
       self.logger.debug("Start retrieving hycom model data: %s" % (start_date))
 
@@ -469,7 +471,7 @@ class florida_wq_historical_data(wq_data):
         self.logger.error("Date: %s out of range of data source." % (start_date))
 
     if self.logger:
-      self.logger.debug("Finished retrieving hycom model data: %s" % (start_date))
+      self.logger.debug("Finished retrieving hycom model data: %s in %f seconds" % (start_date, time.time()-start_time))
     return
 
 
