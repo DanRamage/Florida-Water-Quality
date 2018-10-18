@@ -759,7 +759,7 @@ class florida_wq_model_data(florida_wq_historical_data):
       self.c10_salinity = self.ncObj.variables[kwargs['c_10_salinity_var']][:]
       self.c10_salinity_fill_value = self.ncObj.variables[kwargs['c_10_salinity_var']]._FillValue
     except Exception as e:
-      logger.exception(e)
+        self.logger.exception(e)
     self.model_bbox = kwargs['model_bbox']
     self.model_within_polygon = Polygon(kwargs['model_within_polygon'])
 
@@ -785,7 +785,7 @@ class florida_wq_model_data(florida_wq_historical_data):
       self.hycom_lon_array = self.hycom_model.variables['Longitude'][self.hycom_lonli:self.hycom_lonui]
       self.hycom_lat_array = self.hycom_model.variables['Latitude'][self.hycom_latli:self.hycom_latui]
     except Exception as e:
-      logger.exception(e)
+      self.logger.exception(e)
 
     if self.logger:
       self.logger.debug("Connection to xenia db: %s" % (kwargs['xenia_database_name']))
