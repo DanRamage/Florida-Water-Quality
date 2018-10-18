@@ -10,7 +10,7 @@ import time
 import optparse
 import ConfigParser
 from collections import OrderedDict
-import simplejson as json
+import json
 from yapsy.PluginManager import PluginManager
 
 from wq_prediction_tests import wqEquations
