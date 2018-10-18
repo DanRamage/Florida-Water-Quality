@@ -734,7 +734,6 @@ class florida_wq_historical_data(wq_data):
 
     return
 
-self.model_bbox = kwargs['model_bbox']
 class florida_wq_model_data(florida_wq_historical_data):
   def __init__(self, **kwargs):
     wq_data.__init__(self, **kwargs)
@@ -763,6 +762,7 @@ class florida_wq_model_data(florida_wq_historical_data):
     except Exception as e:
         self.logger.exception(e)
     self.model_within_polygon = Polygon(kwargs['model_within_polygon'])
+    self.model_bbox = kwargs['model_bbox']
 
     try:
       start_time = time.time()
