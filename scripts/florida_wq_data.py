@@ -735,7 +735,7 @@ class florida_wq_historical_data(wq_data):
     return
 
 self.model_bbox = kwargs['model_bbox']
-    class florida_wq_model_data(florida_wq_historical_data):
+class florida_wq_model_data(florida_wq_historical_data):
   def __init__(self, **kwargs):
     wq_data.__init__(self, **kwargs)
 
