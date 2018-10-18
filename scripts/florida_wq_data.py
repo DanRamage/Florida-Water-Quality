@@ -734,7 +734,8 @@ class florida_wq_historical_data(wq_data):
 
     return
 
-class florida_wq_model_data(florida_wq_historical_data):
+self.model_bbox = kwargs['model_bbox']
+    class florida_wq_model_data(florida_wq_historical_data):
   def __init__(self, **kwargs):
     wq_data.__init__(self, **kwargs)
 
@@ -747,6 +748,7 @@ class florida_wq_model_data(florida_wq_historical_data):
     self.query_tide_data = True
 
     try:
+      start_time = time.time()
       self.logger.debug("Connecting to thredds endpoint for c10: %s" % (kwargs['c_10_tds_url']))
       #Connect to netcdf file for retrieving data from c10 buoy. To speed up retrieval, we connect
       #only once and retrieve the times.
@@ -760,10 +762,10 @@ class florida_wq_model_data(florida_wq_historical_data):
       self.c10_salinity_fill_value = self.ncObj.variables[kwargs['c_10_salinity_var']]._FillValue
     except Exception as e:
         self.logger.exception(e)
-    self.model_bbox = kwargs['model_bbox']
     self.model_within_polygon = Polygon(kwargs['model_within_polygon'])
 
     try:
+      start_time = time.time()
       self.logger.debug("Connecting to thredds endpoint for hycom data: %s" % (kwargs['hycom_model_tds_url']))
       self.hycom_model = nc.Dataset(kwargs['hycom_model_tds_url'])
       self.logger.debug("Connected to thredds endpoint for hycom in %f seconds" % (time.time() - start_time))
