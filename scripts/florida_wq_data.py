@@ -901,10 +901,12 @@ class florida_wq_model_data(florida_wq_historical_data):
 
     self.initialize_return_data(wq_tests_data, reset_site_specific_data_only)
 
+    self.get_c10_data(start_date, wq_tests_data)
+
     #If we are resetting only the site specific data, no need to re-query these.
     if not reset_site_specific_data_only:
       self.get_nws_data(start_date, wq_tests_data)
-      self.get_c10_data(start_date, wq_tests_data)
+      self.get_get_c10_data(start_date, wq_tests_data)
 
     self.get_tide_data(start_date, wq_tests_data)
     self.get_nexrad_data(start_date, wq_tests_data)
@@ -917,11 +919,93 @@ class florida_wq_model_data(florida_wq_historical_data):
   def get_c10_data(self, start_date, wq_tests_data):
     #Find the starting time index to work from.
     if self.logger:
-      self.logger.debug("Start thredds C10 search for datetime: %s" % (start_date.strftime('%Y-%m-%d %H:%M:%S')))
+      self.logger.debug("Start C10 search for datetime: %s" % (start_date.strftime('%Y-%m-%d %H:%M:%S')))
+    start_time = time.time()
+    platform_handle = 'usf.C10.IMET'
+    # Get the sensor id for wind speed and wind direction
+    salinity_sensor_id = self.xenia_obs_db.sensorExists('salinity', 'psu', platform_handle, 1)
+    salinity_m_type_id = self.xenia_obs_db.mTypeExists('salinity', 'psu')
+    water_temp_sensor_id = self.xenia_obs_db.sensorExists('water_temperature', 'celsius', platform_handle, 1)
+    water_temp_m_type_id = self.xenia_obs_db.mTypeExists('water_temperature', 'celsius')
 
     start_epoch_time = int(get_utc_epoch(start_date) + 0.5)
     end_epoch_time = None
+    end_date = None
     for prev_hour in range(24,192,24):
+      try:
+        begin_date = start_date - timedelta(hours=prev_hour)
+        if end_date is None:
+          end_date = start_date
+        self.logger.debug("Salinity query from: %s to: %s" % (begin_date, end_date))
+        salinity_data = self.xenia_obs_db.session.query(multi_obs) \
+          .filter(multi_obs.m_date >= begin_date) \
+          .filter(multi_obs.m_date < end_date) \
+          .filter(multi_obs.m_type_id == salinity_m_type_id) \
+          .filter(multi_obs.sensor_id == salinity_sensor_id) \
+          .order_by(multi_obs.m_date).all()
+        avg_salinity_name = 'c10_avg_salinity_%d' % (prev_hour)
+        min_salinity_name = 'c10_min_salinity_%d' % (prev_hour)
+        max_salinity_name = 'c10_max_salinity_%d' % (prev_hour)
+        for ndx,rec in enumerate(salinity_data):
+          if ndx != 0:
+            wq_tests_data[avg_salinity_name] += rec.m_value
+            if rec.m_value < wq_tests_data[min_salinity_name]:
+              wq_tests_data[min_salinity_name] = rec.m_value
+
+            if rec.m_value > wq_tests_data[max_salinity_name]:
+              wq_tests_data[max_salinity_name] = rec.m_value
+          else:
+            wq_tests_data[avg_salinity_name] = rec.m_value
+            wq_tests_data[min_salinity_name] = rec.m_value
+            wq_tests_data[max_salinity_name] = rec.m_value
+        if len(salinity_data):
+          wq_tests_data[avg_salinity_name] = wq_tests_data[avg_salinity_name] / len(salinity_data)
+          self.logger.debug("Start: %s End: %s Avg Salinity: %s (%s,%s)" \
+                            % (start_date.strftime('%Y-%m-%d %H:%M:%S'),
+                               end_date.strftime('%Y-%m-%d %H:%M:%S'),
+                               str(wq_tests_data[avg_salinity_name]),
+                               str(wq_tests_data[min_salinity_name]),
+                               str(wq_tests_data[max_salinity_name])))
+
+        if prev_hour == 24:
+          self.logger.debug("Water temp query from: %s to: %s" % (begin_date, end_date))
+
+          water_temp_data = self.xenia_obs_db.session.query(multi_obs) \
+            .filter(multi_obs.m_date >= begin_date) \
+            .filter(multi_obs.m_date < end_date) \
+            .filter(multi_obs.m_type_id == water_temp_m_type_id) \
+            .filter(multi_obs.sensor_id == water_temp_sensor_id) \
+            .order_by(multi_obs.m_date).all()
+          avg_name = 'c10_avg_water_temp_%d' % (prev_hour)
+          min_name = 'c10_min_water_temp'
+          max_name = 'c10_max_water_temp'
+          for ndx, rec in enumerate(water_temp_data):
+            if ndx != 0:
+              wq_tests_data[avg_name] += rec.m_value
+              if rec.m_value < wq_tests_data[min_name]:
+                wq_tests_data[min_name] = rec.m_value
+
+              if rec.m_value > wq_tests_data[max_name]:
+                wq_tests_data[max_name] = rec.m_value
+            else:
+              wq_tests_data[avg_name] = rec.m_value
+              wq_tests_data[min_name] = rec.m_value
+              wq_tests_data[max_name] = rec.m_value
+          if len(water_temp_data):
+            wq_tests_data[avg_name] = wq_tests_data[avg_name] / len(water_temp_data)
+            self.logger.debug("Start: %s End: %s Avg Water Temp: %s (%s,%s)" \
+                              % (begin_date.strftime('%Y-%m-%d %H:%M:%S'),
+                                 end_date.strftime('%Y-%m-%d %H:%M:%S'),
+                                 str(wq_tests_data[avg_name]),
+                                 str(wq_tests_data[min_name]),
+                                 str(wq_tests_data[max_name])))
+
+        end_date = begin_date
+      except Exception, e:
+        if self.logger:
+          self.logger.exception(e)
+
+      """
       start_epoch_time = float(get_utc_epoch(start_date - timedelta(hours=prev_hour)))
       if end_epoch_time is None:
         end_epoch_time = float(get_utc_epoch(start_date))
@@ -990,8 +1074,10 @@ class florida_wq_model_data(florida_wq_historical_data):
                           % (start_date.strftime('%Y-%m-%d %H:%M:%S'),
                              str(wq_tests_data['c10_avg_salinity_24']), str(wq_tests_data['c10_min_salinity_24']), str(wq_tests_data['c10_max_salinity_24']),
                              str(wq_tests_data['c10_avg_water_temp_24']), str(wq_tests_data['c10_min_water_temp']), str(wq_tests_data['c10_max_water_temp'])))
-    if self.logger:
-      self.logger.debug("Finished thredds C10 search for datetime: %s" % (start_date.strftime('%Y-%m-%d %H:%M:%S')))
+      """
+
+
+    self.logger.debug("Finished C10 search for datetime: %s in %f seconds" % (start_date.strftime('%Y-%m-%d %H:%M:%S'), time.time()-start_time))
 
     return
 
