@@ -746,6 +746,7 @@ class florida_wq_model_data(florida_wq_historical_data):
     self.tide_data_obj = None
     self.query_tide_data = True
 
+    """
     try:
       start_time = time.time()
       self.logger.debug("Connecting to thredds endpoint for c10: %s" % (kwargs['c_10_tds_url']))
@@ -761,6 +762,7 @@ class florida_wq_model_data(florida_wq_historical_data):
       self.c10_salinity_fill_value = self.ncObj.variables[kwargs['c_10_salinity_var']]._FillValue
     except Exception as e:
         self.logger.exception(e)
+    """
     self.model_within_polygon = Polygon(kwargs['model_within_polygon'])
     self.model_bbox = kwargs['model_bbox']
 
@@ -900,8 +902,6 @@ class florida_wq_model_data(florida_wq_historical_data):
       self.logger.debug("Site: %s start query data for datetime: %s" % (self.site.name, start_date))
 
     self.initialize_return_data(wq_tests_data, reset_site_specific_data_only)
-
-    self.get_c10_data(start_date, wq_tests_data)
 
     #If we are resetting only the site specific data, no need to re-query these.
     if not reset_site_specific_data_only:
