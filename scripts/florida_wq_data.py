@@ -906,7 +906,7 @@ class florida_wq_model_data(florida_wq_historical_data):
     #If we are resetting only the site specific data, no need to re-query these.
     if not reset_site_specific_data_only:
       self.get_nws_data(start_date, wq_tests_data)
-      self.get_get_c10_data(start_date, wq_tests_data)
+      self.get_c10_data(start_date, wq_tests_data)
 
     self.get_tide_data(start_date, wq_tests_data)
     self.get_nexrad_data(start_date, wq_tests_data)
