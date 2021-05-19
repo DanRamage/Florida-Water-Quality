@@ -35,10 +35,10 @@ def read_sheet_data(work_sheet, site_name, output_dir):
   with open(output_filename, 'w') as csv_output_file:
     for row_num in range(1, row_count+1):
       row_data = []
-      print "Processing row: %d" % (row_num)
+      print("Processing row: %d") % (row_num)
       #Start at column 2 since we don't need the first column.
       for col_num in range(2, col_count+1):
-        print "Processing col: %d" % (col_num)
+        print("Processing col: %d") % (col_num)
         cell = work_sheet.cell(row=row_num, column=col_num)
         #Header row
         if row_num == 1:
@@ -77,7 +77,7 @@ def write_ini_file(site, models, config_file):
 
     model_config_parser = ConfigParser.ConfigParser()
     model_config_outfile_name = os.path.join(config_file_outdir, '%s.ini' % (site.name))
-  except ConfigParser.Error, e:
+  except ConfigParser.Error as e:
     traceback.print_exc(e)
   else:
     model_count = len(models)
@@ -89,7 +89,7 @@ def write_ini_file(site, models, config_file):
     model_cnt = 1
     for model in models:
       model_section = "model_%d" % (model_cnt)
-      print "Model: %s" % (model_section)
+      print("Model: %s") % (model_section)
       model_config_parser.add_section(model_section)
       data_file = os.path.join(model_data_directory, '%s%s.csv' % (site.name, model))
       model_config_parser.set(model_section, "model_name", model)
@@ -114,7 +114,7 @@ def write_ini_file(site, models, config_file):
   try:
     with open(model_config_outfile_name, 'w') as model_config_ini_obj:
       model_config_parser.write(model_config_ini_obj)
-  except IOError, e:
+  except IOError as e:
     traceback.print_exc(e)
 
   return
@@ -136,7 +136,7 @@ def main():
   try:
     config_file = ConfigParser.RawConfigParser()
     config_file.read(options.config_file)
-  except Exception, e:
+  except Exception as e:
     raise
   else:
     try:
@@ -145,7 +145,7 @@ def main():
       sites_location_file = config_file.get('boundaries_settings', 'sample_sites')
       station_model_dir = config_file.get('station_model_files', 'prediction_config_dir')
       config_file_directory = config_file.get('r_settings', 'config_file_directory')
-    except ConfigParser.Error, e:
+    except ConfigParser.Error as e:
       traceback.print_exc(e)
     else:
       fl_sites = florida_sample_sites(True)
@@ -158,14 +158,14 @@ def main():
           try:
             site_config_file = ConfigParser.RawConfigParser()
             site_config_file.read(site_config_filename)
-          except Exception, e:
+          except Exception as e:
             traceback.print_exc(e)
           else:
             models = OrderedDict()
             sheet_names = site_data_wb.get_sheet_names()
             for ws_name in sheet_names:
               work_sheet = site_data_wb[ws_name]
-              print "Processing sheet: %s" % (ws_name)
+              print("Processing sheet: %s") % (ws_name)
               wb_data = read_sheet_data(work_sheet, site.name, config_file_directory)
               models[ws_name] = wb_data
             write_ini_file(site, models, config_file)
