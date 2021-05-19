@@ -1,6 +1,6 @@
 #!/bin/bash
 
-source /usr2/virtualenvs/pyenv2.7/bin/activate;
+source /usr/local/virtualenv/pyenv-3.8.5/bin/activate
 
 cd /home/xeniaprod/scripts/Florida-Water-Quality/scripts;
 
