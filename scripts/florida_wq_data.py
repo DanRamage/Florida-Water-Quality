@@ -78,7 +78,7 @@ class florida_sample_sites(sampling_sites):
 
         sites_file = open(kwargs['file_name'], "rU")
         dict_file = csv.DictReader(sites_file, delimiter=',', quotechar='"', fieldnames=header_row)
-      except IOError, e:
+      except IOError as e:
         if self.logger:
           self.logger.exception(e)
       else:
@@ -466,7 +466,7 @@ class florida_wq_historical_data(wq_data):
                                  cell_lat, pt.x, cell_lon, pt.y,\
                                  wq_tests_data['hycom_avg_salinity_24'],wq_tests_data['hycom_avg_water_temp_24']))
 
-        except Exception, e:
+        except Exception as e:
           if self.logger:
             self.logger.exception(e)
 
@@ -511,7 +511,7 @@ class florida_wq_historical_data(wq_data):
                              time_zone='GMT')
           wq_tests_data['tide_stage_%s' % (self.tide_station)] = tide_stage
 
-        except Exception,e:
+        except Exception as e:
           if self.logger:
             self.logger.exception(e)
 
@@ -546,14 +546,14 @@ class florida_wq_historical_data(wq_data):
                            timezone='GMT',
                            smoothData=False)
         """
-      except Exception,e:
+      except Exception as e:
         if self.logger:
           self.logger.exception(e)
       else:
         if tide_data and tide_data['HH'] is not None and tide_data['LL'] is not None:
           try:
             range = tide_data['HH']['value'] - tide_data['LL']['value']
-          except TypeError, e:
+          except TypeError as e:
             if self.logger:
               self.logger.exception(e)
           else:
@@ -1001,7 +1001,7 @@ class florida_wq_model_data(florida_wq_historical_data):
                                  str(wq_tests_data[max_name])))
 
         end_date = begin_date
-      except Exception, e:
+      except Exception as e:
         if self.logger:
           self.logger.exception(e)
 
@@ -1074,9 +1074,9 @@ class florida_wq_model_data(florida_wq_historical_data):
                           % (start_date.strftime('%Y-%m-%d %H:%M:%S'),
                              str(wq_tests_data['c10_avg_salinity_24']), str(wq_tests_data['c10_min_salinity_24']), str(wq_tests_data['c10_max_salinity_24']),
                              str(wq_tests_data['c10_avg_water_temp_24']), str(wq_tests_data['c10_min_water_temp']), str(wq_tests_data['c10_max_water_temp'])))
+
+
       """
-
-
     self.logger.debug("Finished C10 search for datetime: %s in %f seconds" % (start_date.strftime('%Y-%m-%d %H:%M:%S'), time.time()-start_time))
 
     return
@@ -1114,7 +1114,7 @@ class florida_wq_model_data(florida_wq_historical_data):
           .filter(multi_obs.m_date >= begin_date)\
           .filter(multi_obs.m_date < end_date)\
           .order_by(multi_obs.m_date).all()
-      except Exception, e:
+      except Exception as e:
         if self.logger:
           self.logger.exception(e)
       else:
