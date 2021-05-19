@@ -88,7 +88,7 @@ def main():
           stations = [station['name'] for station in boundary['station_list']]
         out_file.write("\"%s\",\"%s\",\"%s\"\n" % (boundary['polygon'].wkt, boundary['name'], ",".join(stations)))
     """
-  except IOError, e:
+  except IOError as e:
     import traceback
     traceback.print_exc(e)
   return

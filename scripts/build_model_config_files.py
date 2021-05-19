@@ -38,14 +38,14 @@ def main():
       logger = logging.getLogger('florida_wq_predicition_logger')
       logger.info("Log file opened.")
 
-  except ConfigParser.Error, e:
+  except ConfigParser.Error as e:
     traceback.print_exc(e)
     sys.exit(-1)
 
   try:
     boundaries_location_file = config_file.get('boundaries_settings', 'boundaries_file')
     sites_location_file = config_file.get('boundaries_settings', 'sample_sites')
-  except ConfigParser.Error,e:
+  except ConfigParser.Error as e:
     if logger:
       logger.exception(e)
   else:
@@ -105,7 +105,7 @@ def main():
               line_num += 1
             model_config_parser.set("settings", "model_count", model_count)
             model_config_parser.write(model_config_ini_obj)
-      except IOError, e:
+      except IOError as e:
         if logger:
           logger.exception(e)
       #    for site in fl_sites:

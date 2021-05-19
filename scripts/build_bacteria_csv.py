@@ -37,7 +37,7 @@ def main():
     sites_location_file = config_file.get('boundaries_settings', 'sample_sites')
     station_results_directory = config_file.get('json_settings', 'station_results_directory')
 
-  except Exception, e:
+  except Exception as e:
     raise
   else:
     fl_sites = florida_sample_sites(True)
@@ -66,7 +66,7 @@ def main():
                   if sample_date not in unique_dates:
                     unique_dates.append(sample_date)
 
-            except IOError,e:
+            except IOError as e:
               if logger:
                 logger.exception(e)
 
@@ -75,7 +75,7 @@ def main():
           unique_dates.sort()
           dates_file_obj.write((','.join(unique_dates)))
 
-    except IOError, e:
+    except IOError as e:
       if logger:
         logger.exception(e)
 

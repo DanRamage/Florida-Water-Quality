@@ -33,7 +33,7 @@ def check_email_for_update(config_file):
     email_user = email_ini_config_file.get("sarasota_email_settings", "user")
     email_password = email_ini_config_file.get("sarasota_email_settings", "password")
     destination_directory = config_file.get("worksheet_settings", "destination_directory")
-  except ConfigParser.Error, e:
+  except ConfigParser.Error as e:
     if logger:
       logger.exception(e)
   try:
@@ -184,7 +184,7 @@ def build_current_file(data_dict, date_keys, config_file, fl_sites, build_missin
     advisory_results_filename = config_file.get('json_settings', 'advisory_results')
     station_results_directory = config_file.get('json_settings', 'station_results_directory')
 
-  except ConfigParser.Error, e:
+  except ConfigParser.Error as e:
     if logger:
       logger.exception(e)
   else:
@@ -251,7 +251,7 @@ def build_station_file(bacteria_data, data_date, config_file, fl_sites, build_mi
   try:
     station_results_directory = config_file.get('json_settings', 'station_results_directory')
 
-  except ConfigParser.Error, e:
+  except ConfigParser.Error as e:
     if logger:
       logger.exception(e)
   else:
@@ -443,7 +443,7 @@ def main():
   try:
     config_file = ConfigParser.RawConfigParser()
     config_file.read(options.config_file)
-  except Exception, e:
+  except Exception as e:
     raise
   else:
     logger = None
@@ -456,7 +456,7 @@ def main():
         logging.config.fileConfig(logConfFile)
         logger = logging.getLogger('florida_wq_bact_harvest_logger')
         logger.info("Log file opened.")
-    except ConfigParser.Error, e:
+    except ConfigParser.Error as e:
       if logger:
         logger.exception(e)
     else:

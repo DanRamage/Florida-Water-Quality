@@ -108,7 +108,7 @@ def import_nws_data(nws_directory, xenia_db_name):
 
     sensor_id, m_type_id = xenia_db.add_sensor_to_platform(platform_handle, 'wind_from_direction', 'degrees_true', 1)
     sensor_ids['wind_from_direction'] = {'sensor_id': sensor_id, 'm_type_id': m_type_id}
-  except ValueError, e:
+  except ValueError as e:
     if logger:
       logger.exception(e)
   else:
@@ -131,19 +131,19 @@ def import_nws_data(nws_directory, xenia_db_name):
                 try:
                   date_data = eastern.localize(datetime.strptime('%sT%s' % (row['Date'], time_padded), '%Y%m%dT%H%M'))
                   date_data_utc = date_data.astimezone(timezone('UTC'))
-                except Exception, e:
+                except Exception as e:
                   if logger:
                     logger.exception(e)
                 try:
                   air_temp = float(row['DryBulbCelsius'])
-                except ValueError, e:
+                except ValueError as e:
                   air_temp = None
                   if logger:
                     logger.exception(e)
                 try:
                   wind_speed = float(row['WindSpeed'])
                   wind_dir = float(row['WindDirection'])
-                except ValueError, e:
+                except ValueError as e:
                   wind_speed = None
                   wind_dir = None
                   if logger:
@@ -482,10 +482,10 @@ def import_tide_data(config_file, output_file, start_time_midnight):
                   time_val = "%02d:%02d:00" % (int(hours_mins[0]), int(hours_mins[1]))
                 try:
                   wq_date = eastern.localize(datetime.strptime('%s %s' % (date_val, time_val), '%m/%d/%y %H:%M:%S'))
-                except ValueError, e:
+                except ValueError as e:
                   try:
                     wq_date = eastern.localize(datetime.strptime('%s %s' % (date_val, time_val), '%m/%d/%Y %H:%M:%S'))
-                  except ValueError, e:
+                  except ValueError as e:
                     if logger:
                       logger.error("Processing halted at line: %d" % (line_num))
                       logger.exception(e)
@@ -532,7 +532,7 @@ def import_tide_data(config_file, output_file, start_time_midnight):
                         #Save tide station values.
                         tide_hi = tide_data['HH']['value']
                         tide_lo = tide_data['LL']['value']
-                      except TypeError, e:
+                      except TypeError as e:
                         if logger:
                           logger.exception(e)
                     else:
@@ -542,7 +542,7 @@ def import_tide_data(config_file, output_file, start_time_midnight):
                         tide_hi = tide_data['PeakValue']['value']
                         tide_lo = tide_data['ValleyValue']['value']
                         tide_range = tide_hi - tide_lo
-                      except TypeError, e:
+                      except TypeError as e:
                         if logger:
                           logger.exception(e)
 
@@ -559,7 +559,7 @@ def import_tide_data(config_file, output_file, start_time_midnight):
 
           line_num += 1
 
-  except IOError, e:
+  except IOError as e:
     if logger:
       logger.exception(e)
 
@@ -602,7 +602,7 @@ def main():
       logger = logging.getLogger('florida_wq_processing_logger')
       logger.info("Log file opened.")
     xenia_db = configFile.get('database', 'name')
-  except ConfigParser.Error, e:
+  except ConfigParser.Error as e:
     import traceback
     traceback.print_exc(e)
     sys.exit(-1)
