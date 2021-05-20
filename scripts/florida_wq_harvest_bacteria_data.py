@@ -11,7 +11,7 @@ if sys.version_info[0] < 3:
   import ConfigParser
 else:
   import configparser as ConfigParser
-import simplejson as json
+import json
 import datetime
 
 from florida_wq_data import florida_sample_sites
