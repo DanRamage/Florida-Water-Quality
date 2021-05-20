@@ -93,6 +93,7 @@ def check_email_for_update(config_file):
               #parse_sheet_data(saved_file_name, use_logging)
     except Exception as e:
       logger.exception(e)
+
     #pop3_obj.quit()
 
   if logger:
