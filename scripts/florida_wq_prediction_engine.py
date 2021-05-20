@@ -445,7 +445,7 @@ class fl_prediction_engine(wq_prediction_engine):
                                       hycom_model_tds_url=hycom_model_tds_url,
                                       model_bbox=model_bbox,
                                       model_within_polygon=model_within_polygon,
-                                      xenia_obs_db_type='postgres',
+                                      xenia_obs_db_type='postgresql',
                                       xenia_obs_db_host=xenia_obs_db_host,
                                       xenia_obs_db_user=xenia_obs_db_user,
                                       xenia_obs_db_password=xenia_obs_db_password,
