@@ -4,7 +4,11 @@ sys.path.append('../commonfiles')
 import os
 import logging.config
 import optparse
-import ConfigParser
+if sys.version_info[0] < 3:
+  import ConfigParser
+else:
+  import configparser as ConfigParser
+
 import simplejson as json
 from florida_wq_data import florida_sample_sites
 from datetime import datetime

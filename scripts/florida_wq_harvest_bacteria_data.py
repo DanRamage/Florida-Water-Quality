@@ -7,7 +7,10 @@ from openpyxl import load_workbook
 import poplib
 import email
 import optparse
-import ConfigParser
+if sys.version_info[0] < 3:
+  import ConfigParser
+else:
+  import configparser as ConfigParser
 import simplejson as json
 import datetime
 

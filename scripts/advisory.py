@@ -3,7 +3,10 @@ import os
 import logging.config
 import requests
 from bs4 import BeautifulSoup
-import ConfigParser
+if sys.version_info[0] < 3:
+  import ConfigParser
+else:
+  import configparser as ConfigParser
 from florida_wq_data import florida_sample_sites
 import re
 import zipfile
