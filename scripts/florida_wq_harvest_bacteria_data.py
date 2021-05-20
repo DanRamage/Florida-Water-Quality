@@ -58,39 +58,41 @@ def check_email_for_update(config_file):
     ##  resp, message, byteCnt = pop3_obj.retr(i)
     #  messages[i] = message
     # messages processing
-    emails, total_bytes = pop3_obj.stat()
-    for i in range(emails):
-        # return in format: (response, ['line', ...], octets)
-        response = pop3_obj.retr(i+1)
-        raw_message = response[1]
+    try:
+      emails, total_bytes = pop3_obj.stat()
+      for i in range(emails):
+          # return in format: (response, ['line', ...], octets)
+          response = pop3_obj.retr(i+1)
+          raw_message = response[1]
 
-        str_message = email.message_from_string("\n".join(raw_message))
+          str_message = email.message_from_string("\n".join(raw_message))
 
-        # save attach
-        for part in str_message.walk():
-          if logger:
-            logger.debug("Content type: %s" % (part.get_content_type()))
-
-          if part.get_content_maintype() == 'multipart':
-            continue
-
-          if part.get('Content-Disposition') is None:
+          # save attach
+          for part in str_message.walk():
             if logger:
-              logger.debug("No content disposition")
-            continue
+              logger.debug("Content type: %s" % (part.get_content_type()))
 
-          filename = part.get_filename()
-          if filename.find('xlsx') != -1:
-            if logger:
-              logger.debug("Attached filename: %s" % (filename))
+            if part.get_content_maintype() == 'multipart':
+              continue
 
-            saved_file_name = os.path.join(destination_directory, filename)
-            with open(saved_file_name, 'wb') as out_file:
-              out_file.write(part.get_payload(decode=1))
-              out_file.close()
-              file_list.append(saved_file_name)
-            #parse_sheet_data(saved_file_name, use_logging)
+            if part.get('Content-Disposition') is None:
+              if logger:
+                logger.debug("No content disposition")
+              continue
 
+            filename = part.get_filename()
+            if filename.find('xlsx') != -1:
+              if logger:
+                logger.debug("Attached filename: %s" % (filename))
+
+              saved_file_name = os.path.join(destination_directory, filename)
+              with open(saved_file_name, 'wb') as out_file:
+                out_file.write(part.get_payload(decode=1))
+                out_file.close()
+                file_list.append(saved_file_name)
+              #parse_sheet_data(saved_file_name, use_logging)
+    except Exception as e:
+      logger.exception(e)
     #pop3_obj.quit()
 
   if logger:
