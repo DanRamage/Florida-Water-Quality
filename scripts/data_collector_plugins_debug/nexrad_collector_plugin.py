@@ -54,7 +54,7 @@ class nexrad_collector_plugin(my_plugin.data_collector_plugin):
       logger.debug("Backfill hours: %d Fill Gaps: %s" % (backfill_hours, fill_gaps))
 
     except (ConfigParser.Error, Exception) as e:
-      traceback.print_exc(e)
+      traceback.print_exc()
       if logger is not None:
         logger.exception(e)
     else:

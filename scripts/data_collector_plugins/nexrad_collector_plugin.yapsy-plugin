@@ -10,3 +10,6 @@ Description = Sarasota/Manatee specific nexrad data processing.
 
 [Settings]
 ini_file=/home/xeniaprod/scripts/Florida-Water-Quality/config/florida_config.ini
+log_config=/home/xeniaprod/scripts/Florida-Water-Quality/config/logconf/floridaXMRGProcessing.conf
+xmrg_log_file=/home/xeniaprod/tmp/log/florida_nexrad_workers.log
+

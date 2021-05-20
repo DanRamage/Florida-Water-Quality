@@ -9,4 +9,6 @@ Website = http://howsthebeach.org
 Description = Sarasota/Manatee specific nexrad data processing.
 
 [Settings]
-ini_file=/Users/danramage/Documents/workspace/WaterQuality/Florida_Water_Quality/config/florida_config-Debug.ini
+ini_file=/Users/danramage/Documents/workspace/WaterQuality/Florida_Water_Quality/config/florida_prediction_config_debug.ini
+log_config=/Users/danramage/Documents/workspace/WaterQuality/Florida_Water_Quality/config/logconf/floridaXMRGProcessingDebug.conf
+xmrg_log_file=/users/danramage/tmp/log/folly_nexrad_workers.log
