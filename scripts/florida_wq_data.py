@@ -18,7 +18,7 @@ from wqHistoricalData import wq_data
 from wqXMRGProcessing import wqDB
 from wqHistoricalData import station_geometry,sampling_sites, wq_defines, geometry_list
 from date_time_utils import get_utc_epoch
-from NOAATideData import noaaTideData
+from NOAATideData import noaaTideData,noaaTideDataExt
 from xeniaSQLAlchemy import xeniaAlchemy, multi_obs
 from stats import calcAvgSpeedAndDir
 from romsTools import closestCellFromPtInPolygon
@@ -524,12 +524,26 @@ class florida_wq_historical_data(wq_data):
       tide_start_time = (start_date - timedelta(hours=24))
       tide_end_time = start_date
 
-      tide = noaaTideData(use_raw=True, logger=self.logger)
-      #tide = noaaTideDataExt(use_raw=True, logger=self.logger)
+      #tide = noaaTideData(use_raw=True, logger=self.logger)
+      tide = noaaTideDataExt(use_raw=True, logger=self.logger)
       #Date/Time format for the NOAA is YYYYMMDD
 
       try:
+        for x in range(0, 5):
+          if self.logger:
+            self.logger.debug("Attempt: %d retrieving tide data for station." % (x + 1))
+            tide_data = tide.calcTideRangePeakDetect(beginDate=tide_start_time,
+                                                       endDate=tide_end_time,
+                                                       station=self.tide_station,
+                                                       datum='MLLW',
+                                                       units='feet',
+                                                       timezone='GMT',
+                                                       smoothData=False,
+                                                       write_tide_data=False)
+          if tide_data is not None:
+            break
 
+        """
         tide_data = tide.calcTideRange(beginDate = tide_start_time,
                            endDate = tide_end_time,
                            station=self.tide_station,
@@ -537,7 +551,7 @@ class florida_wq_historical_data(wq_data):
                            units='feet',
                            timezone='GMT',
                            smoothData=False)
-        """
+        
         tide_data = tide.calcTideRangeExt(beginDate = tide_start_time,
                            endDate = tide_end_time,
                            station=self.tide_station,
