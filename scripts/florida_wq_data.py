@@ -239,6 +239,8 @@ class florida_wq_historical_data(wq_data):
     self.get_nexrad_data(start_date, wq_tests_data)
     self.get_hycom_model_data(start_date, wq_tests_data)
 
+    self.logger.debug("wq_data: %s" % (wq_tests_data))
+
     if self.logger:
       self.logger.debug("Site: %s Finished query data for datetime: %s" % (self.site.name, start_date))
 
@@ -597,7 +599,7 @@ class florida_wq_historical_data(wq_data):
       wq_tests_data['tide_hi_%s' % (tide_station)] = offset_hi
       wq_tests_data['tide_lo_%s' % (tide_station)] = offset_lo
     self.logger.debug("Offset Tide station: {station} Hi: {hi} Lo: {lo} Range: {range}".format(
-      station=self.tide_station,
+      station=self.tide_offset_settings['tide_station'],
       hi=wq_tests_data['tide_hi_%s' % (self.tide_offset_settings['tide_station'])],
       lo=wq_tests_data['tide_lo_%s' % (self.tide_offset_settings['tide_station'])],
       range=wq_tests_data['tide_range_%s' % (self.tide_offset_settings['tide_station'])]
