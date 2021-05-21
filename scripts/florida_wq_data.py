@@ -237,10 +237,7 @@ class florida_wq_historical_data(wq_data):
     self.get_nws_data(start_date, wq_tests_data)
     self.get_c10_data(start_date, wq_tests_data)
     self.get_nexrad_data(start_date, wq_tests_data)
-    #self.get_hycom_model_data(start_date, wq_tests_data)
-
-    for key in wq_tests_data:
-      self.logger.debug("%s: %s" % (key, wq_tests_data[key]))
+    self.get_hycom_model_data(start_date, wq_tests_data)
 
     if self.logger:
       self.logger.debug("Site: %s Finished query data for datetime: %s" % (self.site.name, start_date))
@@ -940,7 +937,10 @@ class florida_wq_model_data(florida_wq_historical_data):
 
     self.get_tide_data(start_date, wq_tests_data)
     self.get_nexrad_data(start_date, wq_tests_data)
-    self.get_hycom_model_data(start_date, wq_tests_data)
+    #self.get_hycom_model_data(start_date, wq_tests_data)
+
+    for key in wq_tests_data:
+      self.logger.debug("%s: %s" % (key, wq_tests_data[key]))
 
     if self.logger:
       self.logger.debug("Site: %s Finished query data for datetime: %s" % (self.site.name, start_date))
