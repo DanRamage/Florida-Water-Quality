@@ -576,6 +576,13 @@ class florida_wq_historical_data(wq_data):
             wq_tests_data['tide_hi_%s' % (self.tide_station)] = tide_data['HH']['value']
             wq_tests_data['tide_lo_%s' % (self.tide_station)] = tide_data['LL']['value']
             wq_tests_data['tide_stage_%s' % (self.tide_station)] = tide_data['tide_stage']
+            self.logger.debug("Tide station: {station} Hi: {hi} Lo: {lo} Range: {range} Stage: {stage}".format(
+              station=self.tide_station,
+              hi=wq_tests_data['tide_hi_%s' % (self.tide_station)],
+              lo=wq_tests_data['tide_lo_%s' % (self.tide_station)],
+              range=wq_tests_data['tide_range_%s' % (self.tide_station)],
+              stage=wq_tests_data['tide_stage_%s' % (self.tide_station)]
+            ))
         else:
           if self.logger:
             self.logger.error("Tide data for station: %s date: %s not available or only partial." % (self.tide_station, start_date))
@@ -589,6 +596,12 @@ class florida_wq_historical_data(wq_data):
       wq_tests_data['tide_range_%s' % (tide_station)] = offset_hi - offset_lo
       wq_tests_data['tide_hi_%s' % (tide_station)] = offset_hi
       wq_tests_data['tide_lo_%s' % (tide_station)] = offset_lo
+    self.logger.debug("Offset Tide station: {station} Hi: {hi} Lo: {lo} Range: {range}".format(
+      station=self.tide_station,
+      hi=wq_tests_data['tide_hi_%s' % (self.tide_offset_settings['tide_station'])],
+      lo=wq_tests_data['tide_lo_%s' % (self.tide_offset_settings['tide_station'])],
+      range=wq_tests_data['tide_range_%s' % (self.tide_offset_settings['tide_station'])]
+    ))
 
     if self.logger:
       self.logger.debug("Finished retrieving tide data for station: %s date: %s" % (self.tide_station, start_date))
