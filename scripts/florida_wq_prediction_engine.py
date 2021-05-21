@@ -490,7 +490,7 @@ class fl_prediction_engine(wq_prediction_engine):
               fl_wq_data.query_data(kwargs['begin_date'], kwargs['begin_date'], site_data, reset_site_specific_data_only)
               reset_site_specific_data_only = True
               for key in site_data:
-                self.logger.debug("%s; %s" % (key, site_data))
+                self.logger.debug("%s: %s" % (key, site_data[key]))
               site_equations.runTests(site_data)
               total_test_time = sum(testObj.test_time for testObj in site_equations.tests)
               self.logger.debug("Site: %s total time to execute models: %f ms" % (site.name, total_test_time * 1000))
