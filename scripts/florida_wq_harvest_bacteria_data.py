@@ -65,7 +65,7 @@ def check_email_for_update(config_file):
           response = pop3_obj.retr(i+1)
           raw_message = response[1]
 
-          str_message = email.message_from_string("\n".join(raw_message))
+          str_message = email.message_from_string((b"\n".join(raw_message)).decode('utf-8'))
 
           # save attach
           for part in str_message.walk():
