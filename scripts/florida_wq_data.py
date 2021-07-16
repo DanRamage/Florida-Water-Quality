@@ -157,7 +157,7 @@ class florida_wq_historical_data(wq_data):
       self.c10_water_temp_01 = self.ncObj.variables['temperature_01'][:]
       self.c10_salinity_01 = self.ncObj.variables['salinity_01'][:]
     except Exception as e:
-      logger.exception(e)
+      self.logger.exception(e)
 
     self.model_bbox = kwargs['model_bbox']
     self.model_within_polygon = Polygon(kwargs['model_within_polygon'])
