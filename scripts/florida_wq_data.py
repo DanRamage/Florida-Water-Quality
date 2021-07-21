@@ -566,15 +566,15 @@ class florida_wq_historical_data(wq_data):
       else:
         if tide_data and tide_data['HH'] is not None and tide_data['LL'] is not None:
           try:
-            range_value = tide_data['HH']['value'] - tide_data['LL']['value']
+            range_value = float(tide_data['HH']['value']) - float(tide_data['LL']['value'])
           except TypeError as e:
             if self.logger:
               self.logger.exception(e)
           else:
             #Save tide station values.
             wq_tests_data['tide_range_%s' % (self.tide_station)] = range_value
-            wq_tests_data['tide_hi_%s' % (self.tide_station)] = tide_data['HH']['value']
-            wq_tests_data['tide_lo_%s' % (self.tide_station)] = tide_data['LL']['value']
+            wq_tests_data['tide_hi_%s' % (self.tide_station)] = float(tide_data['HH']['value'])
+            wq_tests_data['tide_lo_%s' % (self.tide_station)] = float(tide_data['LL']['value'])
             wq_tests_data['tide_stage_%s' % (self.tide_station)] = tide_data['tide_stage']
             self.logger.debug("Tide station: {station} Hi: {hi} Lo: {lo} Range: {range} Stage: {stage}".format(
               station=self.tide_station,
