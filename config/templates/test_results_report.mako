@@ -133,7 +133,7 @@
                                     % endif
                                 %else:
                                   <td>
-                                      NO TEST
+                                      NO TEST-Result None
                                   </td>
                                 %endif
 
@@ -147,7 +147,7 @@
                                     % if test_obj.mlrResult is not None:
                                       ${"%.2f" % (test_obj.mlrResult)}
                                     % else:
-                                      NO TEST
+                                      NO TEST-Result None
                                     % endif
                                   </td>
                                   <td>
@@ -164,7 +164,7 @@
                             %else:
                                 <tr>
                                     <td>
-                                        NO TEST
+                                        NO TEST-Test Obj None
                                     </td>
                                 </tr>
                             % endif
