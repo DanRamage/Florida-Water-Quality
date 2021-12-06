@@ -118,10 +118,14 @@ def parse_sheet_data(xl_file_name):
     cell_value = "%s%d" % (entero_column, row_num)
     cell_date = "%s%d" % (date_column, row_num)
     cell_time = "%s%d" % (time_column, row_num)
-    if isinstance(bacteria_data_sheet[cell_time].value, datetime.time):
-      sample_date_time = datetime.datetime.combine(bacteria_data_sheet[cell_date].value, bacteria_data_sheet[cell_time].value)
-    else:
+    try:
+      if isinstance(bacteria_data_sheet[cell_time].value, datetime.time):
+        sample_date_time = datetime.datetime.combine(bacteria_data_sheet[cell_date].value, bacteria_data_sheet[cell_time].value)
+      else:
+        sample_date_time = bacteria_data_sheet[cell_date].value
+    except Exception as e:
       sample_date_time = bacteria_data_sheet[cell_date].value
+      logger.exception(e)
     site_name = bacteria_data_sheet[cell_name].value.strip().lower()
 
     if site_name not in sample_data:
@@ -269,7 +273,7 @@ def build_station_file(bacteria_data, data_date, config_file, fl_sites, build_mi
 
         station_data = bacteria_data[site.description.lower()]
 
-        if isinstance(station_data['value'], int) or isinstance(station_data['value'], long):
+        if isinstance(station_data['value'], int):# or isinstance(station_data['value'], long):
           values = str(station_data['value'])
         else:
           values = station_data['value'].split(';')
@@ -374,8 +378,8 @@ def get_sarasota_county_data(config_filename, data_dict):
   logger.debug("Received %d wq file emails" % (len(data_file_list)))
   if len(data_file_list):
     for data_file in data_file_list:
-      if data_file == "/Users/danramage/Documents/workspace/WaterQuality/Florida_Water_Quality/data/sampling_data/Weekly_Sarasota_Data/02222016.xlsx":
-        i = 0
+      #if data_file == "/Users/danramage/Documents/workspace/WaterQuality/Florida_Water_Quality/data/sampling_data/Weekly_Sarasota_Data/02222016.xlsx":
+      #  i = 0
       sample_data, sample_dates = parse_sheet_data(data_file)
 
       #Some sites can be sampled on different days if they test high one day.
@@ -384,12 +388,14 @@ def get_sarasota_county_data(config_filename, data_dict):
         #Normally a site only has the one sample date, but in the case of
         #resampling there may be multiple.
         for data in sample_data[site]:
-          sample_date = data['sample_date'].date()
-          if sample_date not in data_dict:
-            data_dict[sample_date] = {}
-          date_recs = data_dict[sample_date]
-          date_recs[site] = data
-
+          if isinstance(data['sample_date'], datetime.date):
+            sample_date = data['sample_date'].date()
+            if sample_date not in data_dict:
+              data_dict[sample_date] = {}
+            date_recs = data_dict[sample_date]
+            date_recs[site] = data
+          else:
+            logger.error("Site: %s Invalid date: %s" % (site, data['sample_date']))
 def get_manatee_county_data(config_filename, fl_sites, data_dict):
   results = []
   logger = logging.getLogger('get_manatee_county_data_logger')
@@ -476,7 +482,8 @@ def main():
 
       date_keys = data_dict.keys()
       #date_keys.sort()
-      date_keys.sort()
+      #date_keys.sort()
+      sorted(date_keys)
       #Build the individual station json files.
       for date_key in date_keys:
         build_station_file(data_dict[date_key], date_key, config_file, fl_sites, True)
