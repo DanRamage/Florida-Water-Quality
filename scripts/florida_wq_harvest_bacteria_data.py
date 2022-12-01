@@ -148,6 +148,54 @@ def parse_sheet_data(xl_file_name):
     logger.debug("Finished parse_sheet_data")
 
   return sample_data, sample_dates
+
+def parse_suncoast_sheet_data(xl_file_name):
+  logger = logging.getLogger()
+  logger.debug("Starting parse_suncoast_sheet_data, parsing file: %s" % (xl_file_name))
+
+  sample_data = {}
+  wb = load_workbook(filename = xl_file_name)
+
+  bacteria_data_sheet = wb['Sheet1']
+  station_column = 'A'
+  sample_dates = []
+  #This sheet is organized with station name in first column, then the next columns are the dates of the samples.
+  #The first row has the dates.
+  for row_ndx,col in enumerate(bacteria_data_sheet.iter_rows(max_row=13)):
+    # This will have the dates in the column headers.
+    if row_ndx == 0:
+      for cell_ndx,cell in enumerate(col):
+        #First cell is the Sample SIte header on the first row, so we ignore it.
+        if cell_ndx > 0:
+          #Date format at the moment is "11.16.22".
+          date = cell.value
+          try:
+            sample_datetime = datetime.datetime.strptime(date, '%m.%d.%y')
+            sample_dates.append(sample_datetime)
+          except Exception as e:
+            logger.exception(e)
+    else:
+      for cell_ndx, cell in enumerate(col):
+        #First cell is the Sample Site name
+        if cell_ndx == 0:
+          site_name = cell.value
+          if site_name not in sample_data:
+            sample_data[site_name] = []
+        #Subsequent cells are the sample values.
+        else:
+          sample_value = cell.value
+          sample_data[site_name].append({
+            'site_name': site_name,
+            'sample_date': sample_dates[cell_ndx-1],
+            'value': sample_value
+          })
+
+
+  logger.debug("Finished parse_sheet_data")
+
+  return sample_data, sample_dates
+
+
 def build_feature(site, sample_date, values, logger):
 
   logger = logging.getLogger('build_feature_logger')
@@ -364,6 +412,74 @@ def build_station_file(bacteria_data, data_date, config_file, fl_sites, build_mi
 
   return
 
+def get_sampling_data(config_filename, data_dict):
+    config_file = ConfigParser.RawConfigParser()
+    config_file.read(config_filename)
+
+    logger = logging.getLogger()
+    logger.debug("Starting get_sampling_data")
+
+    swim_adv = florida_wq_advisory('sarasota', config_filename)
+    data_file_list = check_email_for_update(config_file)
+    logger.debug("Received %d wq file emails" % (len(data_file_list)))
+    if len(data_file_list):
+      for data_file in data_file_list:
+        #For each file, we need to check what type it is. We get results from SUn Coast Water
+        #keeper and Sarasota.
+        wb = load_workbook(filename=data_file)
+        #This is a XLS file from Sarasota.
+        if 'SCHD Bact Results' in wb.sheetnames:
+          process_sarasota_data(data_file, data_dict)
+        #This is probably the newer Sun Coast spreadsheet
+        elif 'Sheet1' in wb.sheetnames:
+          process_suncoast_data(data_file, data_dict)
+
+def process_suncoast_data(data_file, data_dict):
+  logger = logging.getLogger()
+  try:
+    sample_data, sample_dates = parse_suncoast_sheet_data(data_file)
+    # Some sites can be sampled on different days if they test high one day.
+    sites = sample_data.keys()
+    for site in sites:
+      # Normally a site only has the one sample date, but in the case of
+      # resampling there may be multiple.
+      for data in sample_data[site]:
+        if isinstance(data['sample_date'], datetime.date):
+          sample_date = data['sample_date'].date()
+          if sample_date not in data_dict:
+            data_dict[sample_date] = {}
+          date_recs = data_dict[sample_date]
+          date_recs[site] = data
+        else:
+          logger.error("Site: %s Invalid date: %s" % (site, data['sample_date']))
+  except Exception as e:
+    logger.exception(e)
+
+
+def process_sarasota_data(data_file, data_dict):
+  logger = logging.getLogger()
+
+  try:
+    sample_data, sample_dates = parse_sheet_data(data_file)
+
+    # Some sites can be sampled on different days if they test high one day.
+    sites = sample_data.keys()
+    for site in sites:
+      # Normally a site only has the one sample date, but in the case of
+      # resampling there may be multiple.
+      for data in sample_data[site]:
+        if isinstance(data['sample_date'], datetime.date):
+          sample_date = data['sample_date'].date()
+          if sample_date not in data_dict:
+            data_dict[sample_date] = {}
+          date_recs = data_dict[sample_date]
+          date_recs[site] = data
+        else:
+          logger.error("Site: %s Invalid date: %s" % (site, data['sample_date']))
+  except Exception as e:
+    logger.exception(e)
+  return
+
 def get_sarasota_county_data(config_filename, data_dict):
   config_file = ConfigParser.RawConfigParser()
   config_file.read(config_filename)
@@ -477,12 +593,11 @@ def main():
       fl_sites.load_sites(file_name=sites_location_file, boundary_file=boundaries_location_file)
 
       data_dict = {}
-      sarasota_results = get_sarasota_county_data(options.config_file, data_dict)
+      results = get_sampling_data(options.config_file, data_dict)
+      #sarasota_results = get_sarasota_county_data(options.config_file, data_dict)
       #manatee_results = get_manatee_county_data(options.config_file, fl_sites, data_dict)
 
       date_keys = data_dict.keys()
-      #date_keys.sort()
-      #date_keys.sort()
       sorted(date_keys)
       #Build the individual station json files.
       for date_key in date_keys:
