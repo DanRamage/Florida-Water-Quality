@@ -1,6 +1,7 @@
 import sys
 sys.path.append('../commonfiles/python')
 import os
+import time
 import logging.config
 import json
 from openpyxl import load_workbook
@@ -557,8 +558,9 @@ def process_sarasota_data(data_file, data_dict):
   return
 
 def process_all_sample_data(data_file, data_dict, sites_aliases):
+  start_time = time.time()
   logger = logging.getLogger()
-
+  logger.debug("process_all_sample_data started.")
   try:
     sample_data, sample_dates = parse_all_beach_sheet_data(data_file, sites_aliases)
 
@@ -575,9 +577,12 @@ def process_all_sample_data(data_file, data_dict, sites_aliases):
           date_recs = data_dict[sample_date]
           date_recs[site] = data
         else:
-          logger.error("Site: %s Invalid date: %s" % (site, data['sample_date']))
+          logger.error(f"Site: {site} Invalid date: {data['sample_date']}")
   except Exception as e:
     logger.exception(e)
+
+  logger.debug(f"process_all_sample_data finished in {time.time()-start_time} seconds.")
+
   return
 
 def get_sarasota_county_data(config_filename, data_dict):
