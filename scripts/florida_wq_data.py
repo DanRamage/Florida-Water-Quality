@@ -18,7 +18,7 @@ from wqHistoricalData import wq_data
 from wqXMRGProcessing import wqDB
 from wqHistoricalData import station_geometry,sampling_sites, wq_defines, geometry_list
 from date_time_utils import get_utc_epoch
-from NOAATideData import noaaTideData
+from NOAATideData import noaaTideData,noaaTideDataExt
 from xeniaSQLAlchemy import xeniaAlchemy, multi_obs
 from stats import calcAvgSpeedAndDir
 from romsTools import closestCellFromPtInPolygon
@@ -78,7 +78,7 @@ class florida_sample_sites(sampling_sites):
 
         sites_file = open(kwargs['file_name'], "rU")
         dict_file = csv.DictReader(sites_file, delimiter=',', quotechar='"', fieldnames=header_row)
-      except IOError, e:
+      except IOError as e:
         if self.logger:
           self.logger.exception(e)
       else:
@@ -157,7 +157,7 @@ class florida_wq_historical_data(wq_data):
       self.c10_water_temp_01 = self.ncObj.variables['temperature_01'][:]
       self.c10_salinity_01 = self.ncObj.variables['salinity_01'][:]
     except Exception as e:
-      logger.exception(e)
+      self.logger.exception(e)
 
     self.model_bbox = kwargs['model_bbox']
     self.model_within_polygon = Polygon(kwargs['model_within_polygon'])
@@ -466,7 +466,7 @@ class florida_wq_historical_data(wq_data):
                                  cell_lat, pt.x, cell_lon, pt.y,\
                                  wq_tests_data['hycom_avg_salinity_24'],wq_tests_data['hycom_avg_water_temp_24']))
 
-        except Exception, e:
+        except Exception as e:
           if self.logger:
             self.logger.exception(e)
 
@@ -511,7 +511,7 @@ class florida_wq_historical_data(wq_data):
                              time_zone='GMT')
           wq_tests_data['tide_stage_%s' % (self.tide_station)] = tide_stage
 
-        except Exception,e:
+        except Exception as e:
           if self.logger:
             self.logger.exception(e)
 
@@ -524,12 +524,26 @@ class florida_wq_historical_data(wq_data):
       tide_start_time = (start_date - timedelta(hours=24))
       tide_end_time = start_date
 
-      tide = noaaTideData(use_raw=True, logger=self.logger)
-      #tide = noaaTideDataExt(use_raw=True, logger=self.logger)
+      #tide = noaaTideData(use_raw=True, logger=self.logger)
+      tide = noaaTideDataExt(use_raw=True, logger=self.logger)
       #Date/Time format for the NOAA is YYYYMMDD
 
       try:
+        for x in range(0, 5):
+          if self.logger:
+            self.logger.debug("Attempt: %d retrieving tide data for station." % (x + 1))
+            tide_data = tide.calcTideRangePeakDetect(beginDate=tide_start_time,
+                                                       endDate=tide_end_time,
+                                                       station=self.tide_station,
+                                                       datum='MLLW',
+                                                       units='feet',
+                                                       timezone='GMT',
+                                                       smoothData=False,
+                                                       write_tide_data=False)
+          if tide_data is not None:
+            break
 
+        """
         tide_data = tide.calcTideRange(beginDate = tide_start_time,
                            endDate = tide_end_time,
                            station=self.tide_station,
@@ -537,7 +551,7 @@ class florida_wq_historical_data(wq_data):
                            units='feet',
                            timezone='GMT',
                            smoothData=False)
-        """
+        
         tide_data = tide.calcTideRangeExt(beginDate = tide_start_time,
                            endDate = tide_end_time,
                            station=self.tide_station,
@@ -546,22 +560,29 @@ class florida_wq_historical_data(wq_data):
                            timezone='GMT',
                            smoothData=False)
         """
-      except Exception,e:
+      except Exception as e:
         if self.logger:
           self.logger.exception(e)
       else:
         if tide_data and tide_data['HH'] is not None and tide_data['LL'] is not None:
           try:
-            range = tide_data['HH']['value'] - tide_data['LL']['value']
-          except TypeError, e:
+            range_value = float(tide_data['HH']['value']) - float(tide_data['LL']['value'])
+          except TypeError as e:
             if self.logger:
               self.logger.exception(e)
           else:
             #Save tide station values.
-            wq_tests_data['tide_range_%s' % (self.tide_station)] = range
-            wq_tests_data['tide_hi_%s' % (self.tide_station)] = tide_data['HH']['value']
-            wq_tests_data['tide_lo_%s' % (self.tide_station)] = tide_data['LL']['value']
+            wq_tests_data['tide_range_%s' % (self.tide_station)] = range_value
+            wq_tests_data['tide_hi_%s' % (self.tide_station)] = float(tide_data['HH']['value'])
+            wq_tests_data['tide_lo_%s' % (self.tide_station)] = float(tide_data['LL']['value'])
             wq_tests_data['tide_stage_%s' % (self.tide_station)] = tide_data['tide_stage']
+            self.logger.debug("Tide station: {station} Hi: {hi} Lo: {lo} Range: {range} Stage: {stage}".format(
+              station=self.tide_station,
+              hi=wq_tests_data['tide_hi_%s' % (self.tide_station)],
+              lo=wq_tests_data['tide_lo_%s' % (self.tide_station)],
+              range=wq_tests_data['tide_range_%s' % (self.tide_station)],
+              stage=wq_tests_data['tide_stage_%s' % (self.tide_station)]
+            ))
         else:
           if self.logger:
             self.logger.error("Tide data for station: %s date: %s not available or only partial." % (self.tide_station, start_date))
@@ -575,6 +596,12 @@ class florida_wq_historical_data(wq_data):
       wq_tests_data['tide_range_%s' % (tide_station)] = offset_hi - offset_lo
       wq_tests_data['tide_hi_%s' % (tide_station)] = offset_hi
       wq_tests_data['tide_lo_%s' % (tide_station)] = offset_lo
+    self.logger.debug("Offset Tide station: {station} Hi: {hi} Lo: {lo} Range: {range}".format(
+      station=self.tide_offset_settings['tide_station'],
+      hi=wq_tests_data['tide_hi_%s' % (self.tide_offset_settings['tide_station'])],
+      lo=wq_tests_data['tide_lo_%s' % (self.tide_offset_settings['tide_station'])],
+      range=wq_tests_data['tide_range_%s' % (self.tide_offset_settings['tide_station'])]
+    ))
 
     if self.logger:
       self.logger.debug("Finished retrieving tide data for station: %s date: %s" % (self.tide_station, start_date))
@@ -910,7 +937,10 @@ class florida_wq_model_data(florida_wq_historical_data):
 
     self.get_tide_data(start_date, wq_tests_data)
     self.get_nexrad_data(start_date, wq_tests_data)
-    self.get_hycom_model_data(start_date, wq_tests_data)
+    #self.get_hycom_model_data(start_date, wq_tests_data)
+
+    #for key in wq_tests_data:
+    #  self.logger.debug("%s: %s" % (key, wq_tests_data[key]))
 
     if self.logger:
       self.logger.debug("Site: %s Finished query data for datetime: %s" % (self.site.name, start_date))
@@ -1001,7 +1031,7 @@ class florida_wq_model_data(florida_wq_historical_data):
                                  str(wq_tests_data[max_name])))
 
         end_date = begin_date
-      except Exception, e:
+      except Exception as e:
         if self.logger:
           self.logger.exception(e)
 
@@ -1074,9 +1104,9 @@ class florida_wq_model_data(florida_wq_historical_data):
                           % (start_date.strftime('%Y-%m-%d %H:%M:%S'),
                              str(wq_tests_data['c10_avg_salinity_24']), str(wq_tests_data['c10_min_salinity_24']), str(wq_tests_data['c10_max_salinity_24']),
                              str(wq_tests_data['c10_avg_water_temp_24']), str(wq_tests_data['c10_min_water_temp']), str(wq_tests_data['c10_max_water_temp'])))
+
+
       """
-
-
     self.logger.debug("Finished C10 search for datetime: %s in %f seconds" % (start_date.strftime('%Y-%m-%d %H:%M:%S'), time.time()-start_time))
 
     return
@@ -1114,7 +1144,7 @@ class florida_wq_model_data(florida_wq_historical_data):
           .filter(multi_obs.m_date >= begin_date)\
           .filter(multi_obs.m_date < end_date)\
           .order_by(multi_obs.m_date).all()
-      except Exception, e:
+      except Exception as e:
         if self.logger:
           self.logger.exception(e)
       else:

@@ -8,7 +8,10 @@ from pytz import timezone
 import traceback
 import time
 import optparse
-import ConfigParser
+if sys.version_info[0] < 3:
+  import ConfigParser
+else:
+  import configparser as ConfigParser
 from collections import OrderedDict
 import json
 from yapsy.PluginManager import PluginManager
@@ -324,7 +327,7 @@ class fl_prediction_engine(wq_prediction_engine):
       test_config_file = config_file.get(site_name, 'prediction_config')
       entero_lo_limit = config_file.getint('entero_limits', 'limit_lo')
       entero_hi_limit = config_file.getint('entero_limits', 'limit_hi')
-    except ConfigParser.Error, e:
+    except ConfigParser.Error as e:
       self.logger.exception(e)
     else:
       self.logger.debug("Site: %s Model Config File: %s" % (site_name, test_config_file))
@@ -358,7 +361,7 @@ class fl_prediction_engine(wq_prediction_engine):
       config_file = ConfigParser.RawConfigParser()
       config_file.read(output_settings_ini)
       station_results_directory = config_file.get('output', 'station_results_directory')
-    except ConfigParser.Error, e:
+    except ConfigParser.Error as e:
       self.logger.exception(e)
     else:
       station_bacteria_filename = os.path.join(station_results_directory, '%s.json' % (site_name))
@@ -376,7 +379,7 @@ class fl_prediction_engine(wq_prediction_engine):
               else:
                 entero_value = result['value'][0]
               break
-      except IOError, e:
+      except IOError as e:
         self.logger.exception(e)
 
     self.logger.debug("Finished check_site_date_for_sampling_date. Site: %s Date: %s" % (site_name, test_date))
@@ -426,7 +429,7 @@ class fl_prediction_engine(wq_prediction_engine):
       output_plugin_dirs = config_file.get('output_plugins', 'plugin_directories').split(',')
       output_plugins_enable=config_file.getboolean('output_plugins', 'enable')
 
-    except ConfigParser.Error, e:
+    except ConfigParser.Error as e:
       self.logger.exception(e)
     else:
       #Load the sample site information. Has name, location and the boundaries that contain the site.
@@ -442,7 +445,7 @@ class fl_prediction_engine(wq_prediction_engine):
                                       hycom_model_tds_url=hycom_model_tds_url,
                                       model_bbox=model_bbox,
                                       model_within_polygon=model_within_polygon,
-                                      xenia_obs_db_type='postgres',
+                                      xenia_obs_db_type='postgresql',
                                       xenia_obs_db_host=xenia_obs_db_host,
                                       xenia_obs_db_user=xenia_obs_db_user,
                                       xenia_obs_db_password=xenia_obs_db_password,
@@ -475,7 +478,7 @@ class fl_prediction_engine(wq_prediction_engine):
               'hi_tide_height_offset': config_file.getfloat(offset_tide_station, 'hi_tide_height_offset'),
               'lo_tide_height_offset': config_file.getfloat(offset_tide_station, 'lo_tide_height_offset')
             }
-          except ConfigParser.Error, e:
+          except ConfigParser.Error as e:
             self.logger.exception(e)
           else:
             fl_wq_data.reset(site=site,
@@ -486,6 +489,8 @@ class fl_prediction_engine(wq_prediction_engine):
             try:
               fl_wq_data.query_data(kwargs['begin_date'], kwargs['begin_date'], site_data, reset_site_specific_data_only)
               reset_site_specific_data_only = True
+              for key in site_data:
+                self.logger.debug("%s: %s" % (key, site_data[key]))
               site_equations.runTests(site_data)
               total_test_time = sum(testObj.test_time for testObj in site_equations.tests)
               self.logger.debug("Site: %s total time to execute models: %f ms" % (site.name, total_test_time * 1000))
@@ -511,7 +516,7 @@ class fl_prediction_engine(wq_prediction_engine):
                                           'models': site_equations,
                                           'statistics': entero_stats,
                                           'entero_value': entero_value})
-            except Exception,e:
+            except Exception as e:
               self.logger.exception(e)
 
         self.logger.debug("Total time to execute all sites models: %f ms" % (total_time * 1000))
@@ -550,7 +555,7 @@ def main():
       logger.info("Log file opened.")
       use_logging = True
 
-  except ConfigParser.Error, e:
+  except ConfigParser.Error as e:
     traceback.print_exc(e)
     sys.exit(-1)
   else:
@@ -567,7 +572,7 @@ def main():
           #Convert to UTC
           begin_date = est.astimezone(timezone('UTC'))
           dates_to_process.append(begin_date)
-      except Exception,e:
+      except Exception as e:
         if logger:
           logger.exception(e)
     else:
@@ -586,7 +591,7 @@ def main():
                                 config_file_name=options.config_file)
         #run_wq_models(begin_date=process_date,
         #              config_file_name=options.config_file)
-    except Exception, e:
+    except Exception as e:
       logger.exception(e)
 
   if logger:

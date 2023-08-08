@@ -9,4 +9,4 @@ Website = http://howsthebeach.org
 Description = Sarasota/Manatee specific water quality processing.
 
 [Settings]
-csv_outfile=/mnt/wq_feeds/fl_wq/%s-Predictions.csv
+csv_outfile=/mnt/wq_feeds/fl_wq/%%s-Predictions.csv

@@ -38,7 +38,7 @@ class configSettings(xmlConfigFile):
       if(self.loggerName == None):
         self.loggerName = 'xmrg_logger'
       
-    except Exception, e:
+    except Exception as e:
       import traceback     
       print(traceback.print_exc())
       sys.exit(- 1)

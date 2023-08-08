@@ -47,7 +47,7 @@ class email_wq_results(wq_results):
                                                 execution_date=record['execution_date'],
                                                 report_url=report_url)
         report_out_file.write(results_report)
-    except TypeError,e:
+    except TypeError as e:
       if self.logger:
         self.logger.exception(makoExceptions.text_error_template().render())
     except (IOError,AttributeError,Exception) as e:
@@ -63,7 +63,7 @@ class email_wq_results(wq_results):
         smtp.subject(subject)
         smtp.message(results_report)
         smtp.send(content_type="html")
-      except Exception,e:
+      except Exception as e:
         if self.logger:
           self.logger.exception(e)
     if self.logger:
@@ -120,10 +120,10 @@ class json_wq_results(wq_results):
         }
         try:
           json_output_file.write(json.dumps(json_data, sort_keys=True))
-        except Exception,e:
+        except Exception as e:
           if self.logger:
             self.logger.exception(e)
-    except IOError,e:
+    except IOError as e:
       if self.logger:
         self.logger.exception(e)
     if self.logger:
@@ -160,10 +160,10 @@ class csv_wq_results(wq_results):
                                                       test.model_name,
                                                       mlr_result,
                                                       entero_val))
-            except Exception,e:
+            except Exception as e:
               if self.logger:
                 self.logger.exception(e)
-      except IOError,e:
+      except IOError as e:
         if self.logger:
           self.logger.exception(e)
     if self.logger:
