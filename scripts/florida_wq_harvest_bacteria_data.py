@@ -200,20 +200,58 @@ def parse_all_beach_sheet_data(xl_file_name, sites_aliases):
   logger = logging.getLogger('check_email_for_update_logger')
   logger.debug("Starting parse_sheet_data, parsing file: %s" % (xl_file_name))
 
+  column_names_to_lookup = {'station_column': 'SPLocation',
+                            'county_column': 'County',
+                            'date_column': 'Date',
+                            'time_column': 'SampleTime',
+                            'entero_column': 'enterococcus'}
 
   sample_data = {}
   wb = load_workbook(filename = xl_file_name)
   bacteria_data_sheet = wb['AllBeachData_Admin']
+  date_column = ''
+  time_column = ''
+  station_column = ''
+  entero_column = ''
+  county_column = ''
+  '''
   date_column = 'E'
   time_column = 'F'
   station_column = 'D'
   entero_column = 'G'
+  '''
   sample_dates = []
+  #Parse the header row so we can build the indexes.
+  for row in bacteria_data_sheet.iter_rows():
+    col_keys = column_names_to_lookup.keys()
+    for ndx,col in enumerate(row):
+      header_column_name = col.value
+      if header_column_name is not None:
+        for col_key in col_keys:
+          column_lookup_name = column_names_to_lookup[col_key]
+          #Hopefully this fixes the issue of inconsistent headers.
+          if header_column_name.lower() == column_lookup_name.lower():
+            if col_key == 'date_column':
+              date_column = col.column_letter
+            elif col_key == 'time_column':
+              time_column = col.column_letter
+            elif col_key == 'station_column':
+              station_column = col.column_letter
+            elif col_key == 'entero_column':
+              entero_column = col.column_letter
+            elif col_key == 'county_column':
+              county_column = col.column_letter
+      else:
+        logger.error(f"Column index: {ndx} header name None.")
+    break
+  if len(date_column) == 0 or len(time_column) == 0 or len(station_column) == 0 or len(entero_column) == 0:
+    logger.error("Missing a column letter.")
   for row_num in range(2,bacteria_data_sheet.max_row):
     cell_name = "%s%d" % (station_column, row_num)
     cell_value = "%s%d" % (entero_column, row_num)
     cell_date = "%s%d" % (date_column, row_num)
     cell_time = "%s%d" % (time_column, row_num)
+    cell_county = "%s%d" % (county_column, row_num)
     try:
       if isinstance(bacteria_data_sheet[cell_time].value, datetime.time):
         sample_date_time = datetime.datetime.combine(bacteria_data_sheet[cell_date].value, bacteria_data_sheet[cell_time].value)
@@ -227,12 +265,19 @@ def parse_all_beach_sheet_data(xl_file_name, sites_aliases):
     if site_name.lower() in sites_aliases:
       site_name = sites_aliases[site_name.lower()]
 
+    county_name = bacteria_data_sheet[cell_county].value.strip().lower()
     if site_name not in sample_data:
       sample_data[site_name] = []
+    sample_value = None
+    try:
+      sample_value = bacteria_data_sheet[cell_value].value
+    except Exception as e:
+      logger.exception(e)
     sample_data[site_name].append({
       'site_name': site_name,
       'sample_date': sample_date_time,
-      'value': bacteria_data_sheet[cell_value].value
+      'value': sample_value,
+      'county_name': county_name
     })
 
     #sample_data[site_name].append({
