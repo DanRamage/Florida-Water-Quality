@@ -23,6 +23,8 @@ from florida_wq_data import florida_wq_model_data, florida_sample_sites
 from stats import stats
 from output_plugin import output_plugin
 from wq_prediction_engine import wq_prediction_engine
+import multiprocessing
+multiprocessing.set_start_method('fork')
 
 '''
 Function: build_test_objects

@@ -654,7 +654,7 @@ def get_sarasota_county_data(config_filename, data_dict):
         #Normally a site only has the one sample date, but in the case of
         #resampling there may be multiple.
         for data in sample_data[site]:
-          if isinstance(data['sample_date'], datetime.date):
+          if Ltance(data['sample_date'], datetime.date):
             sample_date = data['sample_date'].date()
             if sample_date not in data_dict:
               data_dict[sample_date] = {}

@@ -76,7 +76,7 @@ class florida_sample_sites(sampling_sites):
         if self.logger:
           self.logger.debug("Reading sample sites file: %s" % (kwargs['file_name']))
 
-        sites_file = open(kwargs['file_name'], "rU")
+        sites_file = open(kwargs['file_name'], "r")
         dict_file = csv.DictReader(sites_file, delimiter=',', quotechar='"', fieldnames=header_row)
       except IOError as e:
         if self.logger:
@@ -1123,71 +1123,73 @@ class florida_wq_model_data(florida_wq_historical_data):
 
       if self.logger:
         self.logger.debug("Start retrieving nws platform: %s datetime: %s" % (platform_handle, start_date.strftime('%Y-%m-%d %H:%M:%S')))
-
-      #Get the sensor id for wind speed and wind direction
-      wind_spd_sensor_id = self.xenia_obs_db.sensorExists('wind_speed', 'm_s-1', platform_handle, 1)
-      wind_dir_sensor_id = self.xenia_obs_db.sensorExists('wind_from_direction', 'degrees_true', platform_handle, 1)
-
-      end_date = start_date
-      begin_date = start_date - timedelta(hours=24)
       try:
-        wind_speed_data = self.xenia_obs_db.session.query(multi_obs)\
-          .filter(multi_obs.sensor_id == wind_spd_sensor_id)\
-          .filter(multi_obs.platform_handle.ilike(platform_handle))\
-          .filter(multi_obs.m_date >= begin_date)\
-          .filter(multi_obs.m_date < end_date)\
-          .order_by(multi_obs.m_date).all()
+        #Get the sensor id for wind speed and wind direction
+        wind_spd_sensor_id = self.xenia_obs_db.sensorExists('wind_speed', 'm_s-1', platform_handle, 1)
+        wind_dir_sensor_id = self.xenia_obs_db.sensorExists('wind_from_direction', 'degrees_true', platform_handle, 1)
 
-        wind_dir_data = self.xenia_obs_db.session.query(multi_obs)\
-          .filter(multi_obs.sensor_id == wind_dir_sensor_id)\
-          .filter(multi_obs.platform_handle.ilike(platform_handle))\
-          .filter(multi_obs.m_date >= begin_date)\
-          .filter(multi_obs.m_date < end_date)\
-          .order_by(multi_obs.m_date).all()
-      except Exception as e:
-        if self.logger:
-          self.logger.exception(e)
-      else:
-        wind_dir_tuples = []
-        direction_tuples = []
-        scalar_speed_avg = None
-        speed_count = 0
-        for wind_speed_row in wind_speed_data:
-          for wind_dir_row in wind_dir_data:
-            if wind_speed_row.m_date == wind_dir_row.m_date:
-              if self.logger:
-                self.logger.debug("Building tuple for Speed(%s): %f Dir(%s): %f" % (wind_speed_row.m_date, wind_speed_row.m_value, wind_dir_row.m_date, wind_dir_row.m_value))
-              if scalar_speed_avg is None:
-                scalar_speed_avg = 0
-              scalar_speed_avg += wind_speed_row.m_value
-              speed_count += 1
-              #Vector using both speed and direction.
-              wind_dir_tuples.append((wind_speed_row.m_value, wind_dir_row.m_value))
-              #Vector with speed as constant(1), and direction.
-              direction_tuples.append((1, wind_dir_row.m_value))
-              break
-        if len(wind_dir_tuples):
-          avg_speed_dir_components = calcAvgSpeedAndDir(wind_dir_tuples)
-          if self.logger:
-            self.logger.debug("Platform: %s Avg Wind Speed: %f(m_s-1) %f(mph) Direction: %f" % (platform_handle,
-                                                                                              avg_speed_dir_components[0],
-                                                                                              avg_speed_dir_components[0] * meters_per_second_to_mph,
-                                                                                              avg_speed_dir_components[1]))
+        end_date = start_date
+        begin_date = start_date - timedelta(hours=24)
+        try:
+          wind_speed_data = self.xenia_obs_db.session.query(multi_obs)\
+            .filter(multi_obs.sensor_id == wind_spd_sensor_id)\
+            .filter(multi_obs.platform_handle.ilike(platform_handle))\
+            .filter(multi_obs.m_date >= begin_date)\
+            .filter(multi_obs.m_date < end_date)\
+            .order_by(multi_obs.m_date).all()
 
-          #Unity components, just direction with speeds all 1.
-          avg_dir_components = calcAvgSpeedAndDir(direction_tuples)
-          scalar_speed_avg = scalar_speed_avg / speed_count
-          wq_tests_data['nws_ksrq_avg_wspd'] = scalar_speed_avg * meters_per_second_to_mph
-          wq_tests_data['nws_ksrq_avg_wdir'] = avg_dir_components[1]
+          wind_dir_data = self.xenia_obs_db.session.query(multi_obs)\
+            .filter(multi_obs.sensor_id == wind_dir_sensor_id)\
+            .filter(multi_obs.platform_handle.ilike(platform_handle))\
+            .filter(multi_obs.m_date >= begin_date)\
+            .filter(multi_obs.m_date < end_date)\
+            .order_by(multi_obs.m_date).all()
+        except Exception as e:
           if self.logger:
-            self.logger.debug("Platform: %s Avg Scalar Wind Speed: %f(m_s-1) %f(mph) Direction: %f" % (platform_handle,
-                                                                                                     scalar_speed_avg,
-                                                                                                     scalar_speed_avg * meters_per_second_to_mph,
-                                                                                                     avg_dir_components[1]))
+            self.logger.exception(e)
         else:
-          self.logger.error("Platform %s returned no wind speed/direction data." % (platform_handle))
+          wind_dir_tuples = []
+          direction_tuples = []
+          scalar_speed_avg = None
+          speed_count = 0
+          for wind_speed_row in wind_speed_data:
+            for wind_dir_row in wind_dir_data:
+              if wind_speed_row.m_date == wind_dir_row.m_date:
+                if self.logger:
+                  self.logger.debug("Building tuple for Speed(%s): %f Dir(%s): %f" % (wind_speed_row.m_date, wind_speed_row.m_value, wind_dir_row.m_date, wind_dir_row.m_value))
+                if scalar_speed_avg is None:
+                  scalar_speed_avg = 0
+                scalar_speed_avg += wind_speed_row.m_value
+                speed_count += 1
+                #Vector using both speed and direction.
+                wind_dir_tuples.append((wind_speed_row.m_value, wind_dir_row.m_value))
+                #Vector with speed as constant(1), and direction.
+                direction_tuples.append((1, wind_dir_row.m_value))
+                break
+          if len(wind_dir_tuples):
+            avg_speed_dir_components = calcAvgSpeedAndDir(wind_dir_tuples)
+            if self.logger:
+              self.logger.debug("Platform: %s Avg Wind Speed: %f(m_s-1) %f(mph) Direction: %f" % (platform_handle,
+                                                                                                avg_speed_dir_components[0],
+                                                                                                avg_speed_dir_components[0] * meters_per_second_to_mph,
+                                                                                                avg_speed_dir_components[1]))
 
-      if self.logger:
-        self.logger.debug("Finished retrieving nws platform: %s datetime: %s" % (platform_handle, start_date.strftime('%Y-%m-%d %H:%M:%S')))
+            #Unity components, just direction with speeds all 1.
+            avg_dir_components = calcAvgSpeedAndDir(direction_tuples)
+            scalar_speed_avg = scalar_speed_avg / speed_count
+            wq_tests_data['nws_ksrq_avg_wspd'] = scalar_speed_avg * meters_per_second_to_mph
+            wq_tests_data['nws_ksrq_avg_wdir'] = avg_dir_components[1]
+            if self.logger:
+              self.logger.debug("Platform: %s Avg Scalar Wind Speed: %f(m_s-1) %f(mph) Direction: %f" % (platform_handle,
+                                                                                                       scalar_speed_avg,
+                                                                                                       scalar_speed_avg * meters_per_second_to_mph,
+                                                                                                       avg_dir_components[1]))
+          else:
+            self.logger.error("Platform %s returned no wind speed/direction data." % (platform_handle))
+
+        if self.logger:
+          self.logger.debug("Finished retrieving nws platform: %s datetime: %s" % (platform_handle, start_date.strftime('%Y-%m-%d %H:%M:%S')))
+      except Exception as e:
+        self.logger.exception(e)
 
     return
