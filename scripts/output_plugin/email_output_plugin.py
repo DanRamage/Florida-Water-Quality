@@ -1,12 +1,15 @@
-import sys
-sys.path.append('../../commonfiles/python')
-
-from mako.template import Template
-from mako import exceptions as makoExceptions
-from smtp_utils import smtpClass
-import os
-import logging.config
-from output_plugin import output_plugin
+try:
+  import sys
+  sys.path.append('../../commonfiles/python')
+  from mako.template import Template
+  from mako import exceptions as makoExceptions
+  from smtp_utils import smtpClass
+  import os
+  import logging.config
+  from output_plugin import output_plugin
+except Exception as e:
+  import traceback
+  traceback.print_exc()
 
 class email_output_plugin(output_plugin):
   def __init__(self):
