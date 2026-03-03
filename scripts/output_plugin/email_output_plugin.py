@@ -35,7 +35,7 @@ class email_output_plugin(output_plugin):
   def emit(self, **kwargs):
     if self.logger:
       self.logger.debug("Starting emit for email output.")
-    '''        
+
     try:
       mytemplate = Template(filename=self.results_template)
       file_ext = os.path.splitext(self.result_outfile)
@@ -69,7 +69,7 @@ class email_output_plugin(output_plugin):
       except Exception as e:
         if self.logger:
           self.logger.exception(e)
-    '''
+
     if self.logger:
       self.logger.debug("Finished emit for email output.")
 
