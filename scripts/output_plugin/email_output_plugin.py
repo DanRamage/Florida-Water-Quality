@@ -4,7 +4,7 @@ sys.path.append('../../commonfiles/python')
 #from mako.template import Template
 #from mako import exceptions as makoExceptions
 #from smtp_utils import smtpClass
-#import os
+import os
 import logging.config
 from output_plugin import output_plugin
 
@@ -35,7 +35,7 @@ class email_output_plugin(output_plugin):
   def emit(self, **kwargs):
     if self.logger:
       self.logger.debug("Starting emit for email output.")
-    '''
+    '''        
     try:
       mytemplate = Template(filename=self.results_template)
       file_ext = os.path.splitext(self.result_outfile)
