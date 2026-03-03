@@ -18,7 +18,7 @@ class email_output_plugin(output_plugin):
     try:
       details = kwargs['details']
       self.mailhost = details.get("Settings", "mailhost")
-      self.mailport = None
+      self.mailport = details.getint("Settings", "port")
       self.fromaddr = details.get("Settings", "fromaddr")
       self.toaddrs = details.get("Settings", "toaddrs").split(',')
       self.subject = details.get("Settings", "subject")
@@ -59,7 +59,7 @@ class email_output_plugin(output_plugin):
       try:
         subject = self.subject % (kwargs['prediction_date'])
         #Now send the email.
-        smtp = smtpClass(host=self.mailhost, user=self.user, password=self.password)
+        smtp = smtpClass(host=self.mailhost, user=self.user, password=self.password, port=self.mailport, use_tls=True)
         smtp.rcpt_to(self.toaddrs)
         smtp.from_addr(self.fromaddr)
         smtp.subject(subject)
